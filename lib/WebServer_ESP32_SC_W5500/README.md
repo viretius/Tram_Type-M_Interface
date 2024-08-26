@@ -1,4 +1,4 @@
-## WebServer_ESP32_SC_W5500 Library
+## WebServer_ESP32_SC_W5500 Library (Slightly modded)
 
 [![arduino-library-badge](https://www.ardu-badge.com/badge/WebServer_ESP32_SC_W5500.svg?)](https://www.ardu-badge.com/WebServer_ESP32_SC_W5500)
 [![GitHub release](https://img.shields.io/github/release/khoih-prog/WebServer_ESP32_SC_W5500.svg)](https://github.com/khoih-prog/WebServer_ESP32_SC_W5500/releases)
@@ -10,7 +10,6 @@
 <a href="https://www.buymeacoffee.com/khoihprog6" title="Donate to my libraries using BuyMeACoffee"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-donate-orange.svg?logo=buy-me-a-coffee&logoColor=FFDD00" style="height: 20px !important;width: 200px !important;" ></a>
 
 ---
-Slightly modded
 ---
 
 ## Table of Contents
