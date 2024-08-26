@@ -1,1 +1,0 @@
-esptool.exe --chip esp32s3 --port COM5 --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m 0x310000 C:\Users\Micha\Documents\PlatformIO\Projects\typeM_interface_main\.pio\build\arduino_nano_esp32\firmware.bin
