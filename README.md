@@ -6,7 +6,7 @@ Follow the steps below to perform a fresh upload:
 
 1. **Build Partition Binary**
 
-   1.2 **Flash the `partitions.bin` file to address `0x8000` using the following command:
+1.2 **Flash the `partitions.bin` file to address `0x8000` using the following command:
 
    ```{path/to/esptool/}esptool.exe --port COM5 --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partitions.bin```
 
