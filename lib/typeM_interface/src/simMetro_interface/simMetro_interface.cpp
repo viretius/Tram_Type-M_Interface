@@ -374,7 +374,7 @@ namespace simMetro_interface {
 //receive data and add to according queues
 //================================================================================================================
 
- void serial_rx_task (void * pvParameters)
+void rx_task (void * pvParameters)
 {
   char cmd_buffer[CMD_BUFFER_SIZE];
   char verbose_buffer[VERBOSE_BUFFER_SIZE];
@@ -412,7 +412,7 @@ namespace simMetro_interface {
 //transmit data from queues
 //================================================================================================================
 
- void serial_tx_task (void * pvParameters)
+ void tx_task (void * pvParameters)
 { 
   char buffer[INFO_BUFFER_SIZE]; 
 
@@ -490,7 +490,7 @@ void init()
     xTaskCreate(output_task, "Task3", 2000, NULL, 2, &Task3);
 
     xTaskCreatePinnedToCore(
-      serial_rx_task,       /* Task function. */
+      rx_task,       /* Task function. */
       "Task4",              /* name of task. */
       2000,                 /* Stack size of task */
       NULL,                 /* parameter of the task */
@@ -499,7 +499,7 @@ void init()
       0                     /*pinned to core 0, code runs by default on core 1*/
     );
 
-    xTaskCreatePinnedToCore(serial_tx_task, "Task5", 2000, NULL, 2, &Task5, 0);
+    xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 2, &Task5, 0);
 
     xTaskCreate(config_task, "Task6", 8000, NULL, 2, &Task6);
     vTaskSuspend(Task6);
