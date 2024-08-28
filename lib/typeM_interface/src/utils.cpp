@@ -278,7 +278,7 @@ static const char* get_subtype_str(esp_partition_subtype_t subtype)
 
 void find_and_print_partitions() {
 
-  USBSerial.println("\n\n----------------Find partitions---------------");
+  USBSerial.println("\n\n----------------Find partitions---------------\n");
       
   esp_partition_iterator_t it;
   it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
@@ -287,20 +287,20 @@ void find_and_print_partitions() {
   // label is found. Verify if its the same instance as the one found before.
   for (; it != NULL; it = esp_partition_next(it)) {
       const esp_partition_t *part = esp_partition_get(it);
-      USBSerial.printf("\nfound partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
+      USBSerial.printf("found partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
   }
   esp_partition_iterator_release(it);
 
-  USBSerial.println("\nIterating through data partitions...");
   it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, NULL);
 
   // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired 
   // label is found. Verify if its the same instance as the one found before.
     for (; it != NULL; it = esp_partition_next(it)) {
       const esp_partition_t *part = esp_partition_get(it);
-      USBSerial.printf("\nfound partition '%s' at offset 0x%x with size 0x%x", part->label, part->address, part->size);
+      USBSerial.printf("found partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
   }
 
   // Release the partition iterator to release memory allocated for it
   esp_partition_iterator_release(it);
+  USBSerial.println("\n----------------End of partitions---------------\n\n\n\n");
 }
