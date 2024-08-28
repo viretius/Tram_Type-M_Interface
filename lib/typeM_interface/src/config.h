@@ -1,14 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/*
-Arduino ESP32S3 Nano: 
-static constexpr uint8_t LED_RED = GPIO 46; (B0)
-static constexpr uint8_t LED_GREEN = GPIO 0; (B1)
-static constexpr uint8_t LED_BLUE = GPIO 45; 
-*/
-
-
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -24,16 +16,22 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 #include <USBHIDKeyboard.h>
 
 #include <Adafruit_PCF8591.h>                            
-#include <MCP23017.h> //slightly modded
+#include <MCP23017.h>       //slightly modded
 
 //============================================================
 //various global variables and definitions
 //============================================================
 
+/*
+Arduino ESP32S3 Nano: 
+static constexpr uint8_t LED_RED = GPIO 46; (B0)
+static constexpr uint8_t LED_GREEN = GPIO 0; (B1)
+static constexpr uint8_t LED_BLUE = GPIO 45; 
+*/
+
 #define MAX_IC_COUNT 8
 #define interface_eeprom_address 0
 
-#define ADC_REFERENCE_VOLTAGE 5.0     //VCC of the PCF IC  
 #define ADC_STEP_THRESHOLD 5         //lower number results in higher sensitivity
 
 #define DEBOUNCE_DELAY_MS 50
@@ -49,7 +47,7 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos))) 
 
-extern Preferences preferences;
+extern Preferences preferences;       //api to store data (variable representing choice of interface) in nvs
 
 extern bool config_menu;
 
@@ -77,7 +75,11 @@ extern PCF_Struct pcf_list[MAX_IC_COUNT];
 extern uint8_t VERBOSE;
 extern bool run_config_task;
 
-extern uint8_t acceleration_button[2];
+/*
+* storing i2c address[0] and pin number[1]  
+* used to detect, which direction the throttle is beeing moved to
+*/
+extern uint8_t acceleration_button[2]; 
 extern uint8_t deceleration_button[2];
 extern uint8_t combined_throttle_pin[2];
 

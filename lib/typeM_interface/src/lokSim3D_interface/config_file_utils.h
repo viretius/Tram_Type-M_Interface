@@ -7,11 +7,12 @@
 
 #include <FS.h>
 #include <LittleFS.h>
+#include <FFat.h>
 #include <CSV_Parser.h>
 
 namespace lokSim3D_config{
     bool load_config();
-    void serialConfigMenu();
+    void serial_config_menu();
 };
 
 #endif

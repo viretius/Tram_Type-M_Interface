@@ -28,14 +28,22 @@ MCP-Address  A2   A1    A0   PCF-Address
 #include <typeM_interface.h>
 
 
+
+
+
 void init_typeM_interface() {
     
-    //USB.onEvent(USB_Event_Callback); //for debugging purposes - Serial rx functionality wont work if this line is uncommented
+    //USB.onEvent(USB_Event_Callback); //for debugging purposes - USBSerial rx functionality wont work if this line is uncommented
     //USBSerial.onEvent(USB_Event_Callback); 
 
     USBSerial.begin();
     USB.begin();
     while(!USBSerial);
+    find_and_print_partitions();
+
+    //====================================================================================
+    //actual application initialization
+    //====================================================================================
 
     //load variable from eeprom to determine which interface to use
     preferences.begin("APP", false, "nvs");
@@ -45,9 +53,12 @@ void init_typeM_interface() {
         USBSerial.print(F("\nLokSim3D Setup..."));
         lokSim3D_interface::init();
     } else  {
-        USBSerial.print(F("\nTrainSim Setup..."));
-        trainSim_interface::init();
+        USBSerial.print(F("\nSimMetro Setup..."));
+        simMetro_interface::init();
     }
+
+
+    
 
 }   
 

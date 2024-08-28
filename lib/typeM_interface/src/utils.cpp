@@ -47,7 +47,9 @@ void queue_printf(QueueHandle_t queue, const int size, const char *format, ...) 
     vsnprintf(buffer, size, format, args);
     va_end(args);
     
-    xQueueSend(queue, &buffer, pdMS_TO_TICKS(2));
+    if (xQueueSend(queue, &buffer, pdMS_TO_TICKS(100)) != pdTRUE) {
+      if (VERBOSE) USBSerial.print("Queue is full. Message dropped.");
+    }
 }
 
 size_t getFilesize(fs::FS &fs, const char* path) 
@@ -105,5 +107,200 @@ void clearFile(fs::FS &fs, const char *path)
     file.close();  // Truncate the file to zero length
 }
 
+//=======================================================================================================================================
+//print io configuration in binary format (only used in config_task!, because its not using a queue but printing directly with USBSerial)
+//=======================================================================================================================================
+
+void printBinary(uint16_t value) 
+{
+    
+    for (int t = 0; t < 16; t++) { //print portMode in binary format
+      USBSerial.printf("%i", (CHECK_BIT(value, t)) ? 1 : 0 ); //at USBSerial monitor, bit 0 represents pin 0 and bit 15 pin 15
+    }
+    USBSerial.println();
+}
+
+//==========================================================================================================================
+//let user enter a number with specific bounds
+//==========================================================================================================================
+
+bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound, uint upper_bound, char *info) //returns true (exit to menu) if user entered "C"
+{  
+  memset(&buffer[0], '\0', length); 
+  //USBSerial.read(); 
+  while (USBSerial.available()) USBSerial.read();
+
+  while(!USBSerial.available()) {vTaskDelay(1);} //wait for user-input
+  if (USBSerial.peek() == 'C') return true;     
+
+  int bytesRead = 0;
+  while (USBSerial.available()) 
+  {
+    bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, length - bytesRead);
+    if (bytesRead > 0 || buffer[0] == '\n') break;
+    vTaskDelay(1); 
+  }
+
+  buffer[bytesRead] = '\0'; // String korrekt terminieren
+  USBSerial.printf("\n%s", buffer);
+
+  int error = sscanf(buffer, "%u", var);
+
+  while (error != 1 || *var < lower_bound || *var > upper_bound) 
+  {
+    USBSerial.printf("\nIhre Eingabe: %s", buffer);
+    memset(buffer, '\0', length + 1); // Puffer leeren
+    USBSerial.printf("\n%s\n", info);
+
+    while (USBSerial.available()) USBSerial.read();
+
+    while (!USBSerial.available()) vTaskDelay(1); //wait for userinput
+        
+    if (USBSerial.peek() == 'C') return true;
+        
+    bytesRead = 0;
+    int bytesRead = 0;
+    while (USBSerial.available()) 
+    {
+      bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, length - bytesRead);
+      if (bytesRead > 0 || buffer[0] == '\n') break;
+      vTaskDelay(1); 
+    }
+
+    buffer[bytesRead] = '\0'; // String korrekt terminieren
+    USBSerial.printf("\n%s", buffer);
+    error = sscanf(buffer, "%u", var);
+
+    if (error != 1) USBSerial.println("Bitte eine Nummer eingeben."); // Ungültige Eingabe
+      
+  }
+
+  while (USBSerial.available()) USBSerial.read(); //clear USBSerial hw buffer
+
+  return false;
+}
 
 
+//======================================================================
+//optic feedback for user, to let him know, that the setup is finished 
+//======================================================================
+
+void indicate_finished_setup() 
+{
+  int i, j, t;
+  
+  //turn on all outputs
+  for (i = 0; i < MAX_IC_COUNT; i++) 
+  {
+    if (!mcp_list[i].enabled) continue;
+    for (t = 0; t < 16; t++) 
+    {
+      if (CHECK_BIT(mcp_list[i].portMode, t)) continue; //only set ouputs 
+      mcp_list[i].mcp.digitalWrite(t, 1);
+    }
+  }
+
+  for(i = 0; i <= 255; i++) 
+  {
+    for (t = 0; t < MAX_IC_COUNT; t++) 
+    {
+      if (!pcf_list[t].enabled) continue;
+      pcf_list[t].pcf.analogWrite(i);
+      delay(3);
+    }
+  }
+  delay(100);
+
+  //turn off outputs
+  for (i = 0; i < MAX_IC_COUNT; i++) 
+  {
+    if (!mcp_list[i].enabled) continue;
+    for (t = 0; t < 16; t++) 
+    {
+      if (CHECK_BIT(mcp_list[i].portMode, t)) continue; //only set ouputs 
+      mcp_list[i].mcp.digitalWrite(t, 0);
+    }
+  }
+  
+  for(i = 255; i >= 0; i--) 
+  {
+    for (t = 0; t < MAX_IC_COUNT; t++) 
+    {
+      if (!pcf_list[t].enabled) continue;
+      pcf_list[t].pcf.analogWrite(i);
+    }
+  }  
+
+  // Ensure the analog output is set to 0
+  for (t = 0; t < MAX_IC_COUNT; t++) 
+  {
+    if (!pcf_list[t].enabled) continue;
+    pcf_list[t].pcf.analogWrite(0);
+  }
+
+}
+
+
+//======================================================================
+//partition find functions
+//======================================================================
+
+
+// Get the string name of type enum values used in this example
+static const char* get_type_str(esp_partition_type_t type)
+{
+    switch(type) {
+        case ESP_PARTITION_TYPE_APP:
+            return "ESP_PARTITION_TYPE_APP";
+        case ESP_PARTITION_TYPE_DATA:
+            return "ESP_PARTITION_TYPE_DATA";
+        default:
+            return "UNKNOWN_PARTITION_TYPE"; // type not used in this example
+    }
+}
+
+// Get the string name of subtype enum values used in this example
+static const char* get_subtype_str(esp_partition_subtype_t subtype)
+{
+    switch(subtype) {
+        case ESP_PARTITION_SUBTYPE_DATA_NVS:
+            return "ESP_PARTITION_SUBTYPE_DATA_NVS";
+        case ESP_PARTITION_SUBTYPE_DATA_PHY:
+            return "ESP_PARTITION_SUBTYPE_DATA_PHY";
+        case ESP_PARTITION_SUBTYPE_APP_FACTORY:
+            return "ESP_PARTITION_SUBTYPE_APP_FACTORY";
+        case ESP_PARTITION_SUBTYPE_DATA_FAT:
+            return "ESP_PARTITION_SUBTYPE_DATA_FAT";
+        default:
+            return "UNKNOWN_PARTITION_SUBTYPE"; // subtype not used in this example
+    }
+}
+
+void find_and_print_partitions() {
+
+  USBSerial.println("\n\n----------------Find partitions---------------");
+      
+  esp_partition_iterator_t it;
+  it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
+
+  // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired 
+  // label is found. Verify if its the same instance as the one found before.
+  for (; it != NULL; it = esp_partition_next(it)) {
+      const esp_partition_t *part = esp_partition_get(it);
+      USBSerial.printf("\nfound partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
+  }
+  esp_partition_iterator_release(it);
+
+  USBSerial.println("\nIterating through data partitions...");
+  it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, NULL);
+
+  // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired 
+  // label is found. Verify if its the same instance as the one found before.
+    for (; it != NULL; it = esp_partition_next(it)) {
+      const esp_partition_t *part = esp_partition_get(it);
+      USBSerial.printf("\nfound partition '%s' at offset 0x%x with size 0x%x", part->label, part->address, part->size);
+  }
+
+  // Release the partition iterator to release memory allocated for it
+  esp_partition_iterator_release(it);
+}

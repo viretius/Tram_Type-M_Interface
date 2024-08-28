@@ -1,5 +1,5 @@
 /*
-cvs files: (differ from the ones used for lokSim3D_interface) -> big changes and additions in config_file_utils needed
+cvs files: 
   
   mcp:
   i2c;pin;key_on;key_off;address;info ->key_on/key_off for inputs, address for outputs
@@ -13,12 +13,32 @@ cvs files: (differ from the ones used for lokSim3D_interface) -> big changes and
     -> address "tp" for combined throttle 
 */
 /*
-ToDo:
+key report defines:
 
-  - store specific keys in config-file for each input, that will be sent with usb-hid (keyboard.write)
-    -> e.g. address "S" for "Sander" (Ein/Aus), "L" for "Licht" (Ein/Aus), or "POS1" for "Türen links"
-    -> some functions need one key for "on" and one for "off" (e.g. "L" and "l")
-  
+#define KEY_LEFT_CTRL   0x80
+#define KEY_LEFT_SHIFT  0x81
+#define KEY_LEFT_ALT    0x82
+#define KEY_LEFT_GUI    0x83
+#define KEY_RIGHT_CTRL  0x84
+#define KEY_RIGHT_SHIFT 0x85
+#define KEY_RIGHT_ALT   0x86
+#define KEY_RIGHT_GUI   0x87
+
+#define KEY_UP_ARROW    0xDA
+#define KEY_DOWN_ARROW  0xD9
+#define KEY_LEFT_ARROW  0xD8
+#define KEY_RIGHT_ARROW 0xD7
+#define KEY_BACKSPACE   0xB2
+#define KEY_TAB         0xB3
+#define KEY_RETURN      0xB0
+#define KEY_ESC         0xB1
+#define KEY_INSERT      0xD1
+#define KEY_DELETE      0xD4
+#define KEY_PAGE_UP     0xD3
+#define KEY_PAGE_DOWN   0xD6
+#define KEY_HOME        0xD2
+#define KEY_END         0xD5
+#define KEY_CAPS_LOCK   0xC1
 
 */
 //================================================================================================================
@@ -30,6 +50,7 @@ ToDo:
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED}; 
 char host[] = "8.8.8.8";
 uint16_t port = 80;
+char server[] = "arduino.tips";
 //IPAddress ip(192, 168, 1, 177); // Adjust to your network
 //IPAddress server(8, 8, 8, 8); // Google DNS
 
@@ -58,69 +79,49 @@ using namespace lokSim3D_config;
 
 namespace lokSim3D_interface {
 
-void indicated_finished_setup() 
+
+
+//========================================================================================================
+//pwm output for buzzer
+//========================================================================================================
+
+void toggle_buzzer(uint8_t pin, float frequency) 
 {
-  int i, j, t;
-  
-  //turn on all outputs
-  for (i = 0; i < MAX_IC_COUNT; i++) 
-  {
-    if (!mcp_list[i].enabled) continue;
-    for (t = 0; t < 16; t++) 
-    {
-      if (CHECK_BIT(mcp_list[i].portMode, t)) continue; //only set ouputs 
-      mcp_list[i].mcp.digitalWrite(t, 1);
-    }
-  }
-
-  for(i = 0; i <= 255; i++) 
-  {
-    for (t = 0; t < MAX_IC_COUNT; t++) 
-    {
-      if (!pcf_list[t].enabled) continue;
-      pcf_list[t].pcf.analogWrite(i);
-      delay(3);
-    }
-  }
-  delay(100);
-
-  //turn off outputs
-  for (i = 0; i < MAX_IC_COUNT; i++) 
-  {
-    if (!mcp_list[i].enabled) continue;
-    for (t = 0; t < 16; t++) 
-    {
-      if (CHECK_BIT(mcp_list[i].portMode, t)) continue; //only set ouputs 
-      mcp_list[i].mcp.digitalWrite(t, 0);
-    }
-  }
-  
-  for(i = 255; i >= 0; i--) 
-  {
-    for (t = 0; t < MAX_IC_COUNT; t++) 
-    {
-      if (!pcf_list[t].enabled) continue;
-      pcf_list[t].pcf.analogWrite(i);
-    }
-  }  
-
-  // Ensure the analog output is set to 0
-  for (t = 0; t < MAX_IC_COUNT; t++) 
-  {
-    if (!pcf_list[t].enabled) continue;
-    pcf_list[t].pcf.analogWrite(0);
-  }
 
 }
 
 //========================================================================================================
+//
+//========================================================================================================
 
-/*
-*pwm output for buzzer
-*/
-
-void toggle_buzzer(uint8_t pin, float frequency) 
+void press_and_release_key(KeyReport *keyReport, uint8_t pin) 
 {
+  //in address there might be something like "ctrl+a" or "ctrl+shift+a" or "a" -> split it and send the keys in the correct order
+  char *token = strtok(mcp_list[pin].address[pin], "+");
+  while (token != NULL) 
+  {
+    if (strcmp(token, "ctrl") == 0) (*keyReport).modifiers |= KEY_LEFT_CTRL; // "|=" to combine multiple modifier keys instead of overwriting
+    else if (strcmp(token, "shift") == 0) (*keyReport).modifiers |= KEY_LEFT_SHIFT;
+    else if (strcmp(token, "alt") == 0) (*keyReport).modifiers |= KEY_LEFT_ALT;
+    else if (strcmp(token, "gui") == 0) (*keyReport).modifiers |= KEY_LEFT_GUI;
+    else 
+    {  
+      if ((*keyReport).keys[0] == 0) (*keyReport).keys[0] = (uint8_t)token[0]; 
+      else if ((*keyReport).keys[1] == 0) (*keyReport).keys[1] = (uint8_t)token[0];
+      else if ((*keyReport).keys[2] == 0) (*keyReport).keys[2] = (uint8_t)token[0];
+      else if ((*keyReport).keys[3] == 0) (*keyReport).keys[3] = (uint8_t)token[0];
+      else if ((*keyReport).keys[4] == 0) (*keyReport).keys[4] = (uint8_t)token[0];
+      else if ((*keyReport).keys[5] == 0) (*keyReport).keys[5] = (uint8_t)token[0]; //up to 6 keys can be pressed at once
+    }
+    token = strtok(NULL, "+");
+  }
+  if (eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
+  if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Keyreport: %s", (*keyReport).keys);
+
+  //clear keyreport and send to queue
+  memset(keyReport, 0, sizeof(KeyReport));
+  if (eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
+  if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Keyreport: %s", (*keyReport).keys);
 
 }
 
@@ -129,7 +130,7 @@ void toggle_buzzer(uint8_t pin, float frequency)
 *helper function for analog_input_task
 *maps the value of the potentiometer (throttle, 255 - 0 - 255) in dependency of the two buttons acceleration_indicator and deceleration_indicator to 0 - 255
 */
-//unterschiedliche oder dieselben Kanalnummern für Zug- & Bremskraft?
+//unterschiedliche oder dieselben Kanalnummern für Zug- & Bremskraft!
 
 uint8_t calc_throttle_position(uint8_t value) 
 { 
@@ -174,17 +175,16 @@ void digital_input_task (void * pvParameters)
   uint16_t readingAB = 0b0;
   uint16_t ab_flag = 0b0;     //set bit indicates, which pin of a port changed 
   
-  char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'};              //stores resulting command depending on input that gets queued and later transmitted   
+  KeyReport keyReport;  
   char info_buffer[INFO_BUFFER_SIZE] = {'\0'};
   char data[5];                         //4 chars + nullterminator
   uint8_t t, i, j;                      //lokal for-loop counter
 
-  TickType_t xLastWakeTime;
-  xLastWakeTime = xTaskGetTickCount();     // Initialise the xLastWakeTime variable with the current time, neede for debounce delay
+  TickType_t xLastWakeTime= xTaskGetTickCount();     //used for debounce delay
 
   for(;;)
   {
-   vTaskDelay(1); //run this task only every 10ms pr so 
+   vTaskDelay(5); //run this task only every 10ms pr so 
    //eTaskGetState(Task6) = eTaskGetState(Task6);
 
     for (i = 0; i < MAX_IC_COUNT; i++) 
@@ -244,40 +244,32 @@ void digital_input_task (void * pvParameters)
       {                                         
         if (!CHECK_BIT(ab_flag, t)) continue;      //Check which specific pin changed its state
       
-        memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array                       
-              
-        (ab_flag & readingAB) ? strcpy(data, "0000") : strcpy(data, "0001") ;   //check wether the pin changed from 0 to 1 or 1 to 0 and store according char to "data" variable, inverted because of the implementation in the simulation programm
-              
-        strcat(cmd_buffer, "XU");         //create command-string like "XU" + "00" + "0000" + "Y"
-        strcat(cmd_buffer, mcp_list[i].address[t]);
-        strcat(cmd_buffer, data);
-        strcat(cmd_buffer, "Y");
-                          
-        if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
-
-        if(eTaskGetState(Task6) == eRunning) //user 
-        {
-          memset(&info_buffer[0], '\0', INFO_BUFFER_SIZE);              //clear cmd char array
-          strcpy(info_buffer, "\n[digital_input_task]\n  Pin: ");
+          memset(&keyReport, 0, sizeof(KeyReport));                                  
+          press_and_release_key(&keyReport, t); //set keyReport according to the pin that changed its state and send to queue
+      }             
+        
+      if(eTaskGetState(Task6) == eRunning) //user 
+      {
+        memset(&info_buffer[0], '\0', INFO_BUFFER_SIZE);              //clear cmd char array
+        strcpy(info_buffer, "\n[digital_input_task]\n  Pin: ");
           
-          if (t>7) {
-            strcat(info_buffer, "B");
-            strcat(info_buffer, String(t-8).c_str());
-          }
-          else {
-            strcat(info_buffer, "A");
-            strncat(info_buffer, String(t).c_str(), 1);
-          }
+        if (t>7) {
+          strcat(info_buffer, "B");
+          strcat(info_buffer, String(t-8).c_str());
+        }
+        else {
+          strcat(info_buffer, "A");
+          strncat(info_buffer, String(t).c_str(), 1);
+        }
 
-          strcat(info_buffer, "\n  I2C-Adresse (DEC): ");
-          strcat(info_buffer, String(i+MCP_I2C_BASE_ADDRESS).c_str());
-          strcat(info_buffer, cmd_buffer);
-          strcat(info_buffer, "\n");
-          xQueueSend(serial_tx_info_queue, &info_buffer, pdMS_TO_TICKS(1));
-        }              
-      }
-
+        strcat(info_buffer, "\n  I2C-Adresse (DEC): ");
+        strcat(info_buffer, String(i+MCP_I2C_BASE_ADDRESS).c_str());
+        //strcat(info_buffer, keyReport.keys);
+        strcat(info_buffer, "\n");
+        xQueueSend(serial_tx_info_queue, &info_buffer, pdMS_TO_TICKS(1));
+      }              
     }
+
   } 
 }
 
@@ -297,7 +289,7 @@ void analog_input_task (void * pvParameters)
 
   for(;;)
   {   
-    vTaskDelay(1); 
+    vTaskDelay(5); 
     
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
@@ -374,7 +366,7 @@ void output_task (void * pvParameters)
 
   for(;;)
   {
-    vTaskDelay(1);
+    vTaskDelay(5);
     memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array   
     xQueueReceive(tcp_rx_cmd_queue, &cmd_buffer, portMAX_DELAY); //block this task, if queue is empty
 
@@ -451,61 +443,75 @@ void output_task (void * pvParameters)
 receive data and add to according queues
 */
 
-void tcp_rx_task (void * pvParameters) //also usbserial rx task for config menu
+void rx_task (void * pvParameters) //also usbserial rx task for config menu
 {
-  char cmd_buffer[CMD_BUFFER_SIZE];
+  char buffer[CMD_BUFFER_SIZE];
   char verbose_buffer[VERBOSE_BUFFER_SIZE];
   uint8_t t, i;  
 
+  TickType_t request_interval = pdMS_TO_TICKS(100); 
+  TickType_t last_request = xTaskGetTickCount();       
+
+  TickType_t request_timeout = pdMS_TO_TICKS(5000); // 5 seconds timeout
+  TickType_t request_time = xTaskGetTickCount();
+
   for(;;)
   {
-    vTaskDelay(1);
-    if (USBSerial.available() > 0) //hw rx buffer holds at least one char
+    vTaskDelay(5);
+
+    if (USBSerial.available() > 0) 
     {
-      USBSerial.readBytesUntil('\n', cmd_buffer, CMD_BUFFER_SIZE);                            
-      if (cmd_buffer[0] == 'M' || cmd_buffer[0] == 'm') {
+      USBSerial.readBytesUntil('\n', buffer, CMD_BUFFER_SIZE);                            
+      if (buffer[0] == 'M' || buffer[0] == 'm') {
         vTaskResume(Task6);
       }
     }
-    if (client.connected()) 
-    {
 
-      client.printf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", host);
-        while (client.connected() && !client.available());
-        while (client.available()) 
-        {
-          //USBSerial.write(client.read()); //test
-          //strncpy(cmd_buffer, client.read(), 1); // or something like that
-        }
+
+    if (client.connected() && xTaskGetTickCount() - last_request > request_interval) 
+    {
+      last_request = xTaskGetTickCount();
+      client.println("GET /something HTTP/1.1"); //request data
+      client.println();
+
+      while (!client.available() && (xTaskGetTickCount() - request_time) < request_timeout) {
+          vTaskDelay(pdMS_TO_TICKS(10)); 
+      }
+
+      if (client.available() > 0) 
+      {
+          client.readBytesUntil('\n', buffer, CMD_BUFFER_SIZE); 
+          xQueueSend(tcp_rx_cmd_queue, &buffer, pdMS_TO_TICKS(1));
+      } 
+      else 
+      {
+          if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[rx_task]\n  Timeout: Keine Daten vom LOKSIM3D-Server empfangen.\n");
+      }
     }
-    else {
-      /*
-      serial print client disconnected
-      client.stop();
-      reconnect(timeout);
-      */
-    //client.stop();
-    }
+
   }
 }
 
 /*
 transmit data from queues
 */
-void keyboard_tx_task (void * pvParameters)
-{ 
-  //char cmd_buffer[CMD_BUFFER_SIZE];
-  //char info_buffer[INFO_BUFFER_SIZE];
-  //char verbose_buffer[VERBOSE_BUFFER_SIZE];
-  char keyReport;
+void tx_task (void * pvParameters) 
+{ /*
+  typedef struct
+  {
+    uint8_t modifiers;
+    uint8_t reserved;
+    uint8_t keys[6];
+  } KeyReport;*/
+  KeyReport keyReport;
 
   char buffer[INFO_BUFFER_SIZE]; //only one buffer -> overwrite content after USBSerial.print
 
   for(;;)
   {
-    vTaskDelay(1);
+    vTaskDelay(5);
 
-    if (xQueueReceive(keyboard_tx_queue, &keyReport, 1) == pdTRUE)    Keyboard.write(keyReport);
+    if (xQueueReceive(keyboard_tx_queue, &keyReport, 1) == pdTRUE)    Keyboard.sendReport(&keyReport);
      
     if (VERBOSE && xQueueReceive(serial_tx_verbose_queue, &buffer, 1) == pdTRUE)     USBSerial.print(buffer);
     
@@ -516,14 +522,16 @@ void keyboard_tx_task (void * pvParameters)
 
 /*
 *configuration menu
+*own task to be able to suspend and resume other tasks from within this function
+*dont judge me for the code quality, it's just a configuration menu and i am not a professional programmer
 */
 
 void config_task (void * pvParameters)
 {
   for(;;)
   {
-    vTaskDelay(1);
-    serialConfigMenu();  //tasks 1,2&5 can be resumed from within this function
+    vTaskDelay(5);
+    serial_config_menu();  //tasks 1,2&5 can be resumed from within this function
   }
 }
 
@@ -537,73 +545,71 @@ void init()
     Keyboard.begin();
     while(!USBSerial);
 
-    if (!load_config()) USBSerial.print(F("\nKonfigurationen konnten nicht geladen werden.\nSetup wird fortgesetzt."));
+    if (!load_config()) return;
     
     /*Keyboard.press('M');  //test
     vTaskDelay(1000); 
     Keyboard.releaseAll();*/
     
     /*
-    USBSerial_rx_cmd_queue:
+    USBSerial_rx_cm_queue:
     -1 slot with size of an integer, FIFO principal, stores commands "executed" in output_task
     -only for com between tasks. only one command (of size (CMD_BUFFER_SIZE)) large, because the hardware rx buffer of the esp32 is 256 bytes large
     */
     tcp_rx_cmd_queue = xQueueCreate(2, CMD_BUFFER_SIZE); 
-    keyboard_tx_queue = xQueueCreate(2, CMD_BUFFER_SIZE);   //stores commands, that are created in both input-tasks and then transmitted by the tx task through the USBSerial com port
+    keyboard_tx_queue = xQueueCreate(2, sizeof(KeyReport));   //stores commands, that are created in both input-tasks and then transmitted by the tx task 
     serial_tx_info_queue = xQueueCreate(3, INFO_BUFFER_SIZE); //stores i2c address and MCP Pin, if run_config_task==true  
     serial_tx_verbose_queue = xQueueCreate(5, VERBOSE_BUFFER_SIZE); //other stuff that can be helpfull for debugging
     
     i2c_mutex = xSemaphoreCreateMutex();
 
+    xTaskCreatePinnedToCore(
+      rx_task,          /* Task function. */
+      "Task4",              /* name of task. */
+      2000,                 /* Stack size */
+      NULL,                 /* optional parameters*/
+      1,                    /* priority */
+      &Task4,               /* Task handle to keep track of created task */
+      0                     /*pinned to core 0*/
+    );
     xTaskCreate(digital_input_task, "Task1", 2000, NULL, 1, &Task1);
     xTaskCreate(analog_input_task, "Task2", 2000, NULL, 1, &Task2);
     xTaskCreate(output_task, "Task3", 2000, NULL, 1, &Task3);
-
-    xTaskCreatePinnedToCore(keyboard_tx_task, "Task5", 2000, NULL, 1, &Task5, 0);
-    xTaskCreatePinnedToCore(
-      tcp_rx_task,       /* Task function. */
-      "Task4",              /* name of task. */
-      2000,                 /* Stack size of task */
-      NULL,                 /* parameter of the task */
-      1,                    /* priority of the task */
-      &Task4,               /* Task handle to keep track of created task */
-      0                     /*pinned to core 0, code runs by default on core 1*/
-    );
+    xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 1, &Task5, 0);
     xTaskCreate(config_task, "Task6", 8000, NULL, 1, &Task6);
+    
     vTaskSuspend(Task6);
     vTaskSuspend(Task1);
     vTaskSuspend(Task2);
     vTaskSuspend(Task3);
     vTaskSuspend(Task5);
 
-
     USBSerial.print(F("\n\nVerbindung zu W5500 Ethernet Shield wird hergestellt...\n"));
 
     // To be called before ETH.begin()
     ESP32_W5500_onEvent();
-
    
     ETH.begin( MISO_GPIO, MOSI_GPIO, SCK_GPIO, CS_GPIO, INT_GPIO, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac );
     
-    //ESP32_W5500_waitForConnect();
+    ESP32_W5500_waitForConnect();
 
     USBSerial.print(F("\nVerbindung erfolgreich hergestellt.\n"));
     USBSerial.print(F("\nVerbindung zu LOKSIM3D TCP-Server wird hergestellt...\n"));
     
-    if (client.connect(host, port)){
+    if (client.connect(server, port)){
       //USBSerial.println(F("Verbindung mit LOKSIM3D TCP-Server erfolgreich hergestellt.\n"));
-      Serial.println("Connected to server");
-      client.println("GET / HTTP/1.1");
-      client.println("Host: 8.8.8.8");
+      USBSerial.println("Connected to server");
+
+      client.println("GET /something HTTP/1.1");
+      client.println("Host: somehost.com");
       client.println("Connection: close");
       client.println();
     }
-  
-    USBSerial.print(F("\nTasks werden erstellt...\n"));
 
-    indicated_finished_setup();
+    indicate_finished_setup();
 
-    USBSerial.print(F("\nTasks erfolgreich erstellt.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));
+
+    USBSerial.print(F("\nTasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));
   
   }
 } //namespace lokSim3D_interface

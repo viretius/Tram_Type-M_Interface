@@ -2,7 +2,10 @@
 cvs files: 
   
   mcp:
-  i2c;pin;key;address;info 
+  i2c;pin;key;address;info ->key not used for simMetro
+
+    -> key_on "ps" for acceleration indicator button
+    -> key_off "ns" for deceleration indicator button
      
   pcf: 
   i2c;pin;key;address;info
@@ -10,18 +13,12 @@ cvs files:
     -> address "tp" for combined throttle 
 */
 
-#include "lokSim3D_interface/config_file_utils.h"
+#include <simMetro_interface/config_file_utils.h>
 
-/*
-*functions for file/data management
-*openFile() functions return a File object. 
-*This object supports all the functions of Stream, 
-*so you can use readBytes, findUntil, parseInt, println, and all other Stream methods
-*/ 
-
-using namespace lokSim3D_interface;
-
-namespace lokSim3D_config {
+using namespace simMetro_interface;
+  
+namespace simMetro_config{
+  
 
 bool load_config()
 {
@@ -30,7 +27,7 @@ bool load_config()
     USBSerial.print(F("\nLittleFS Mount fehlgeschlagen.\nKonfiguration konnte nicht geladen werden.\nSetup abgebrochen.\n"));
     return 0;
   }
-  
+    
   uint8_t i, t; //lokal for loop counter
   uint8_t mcp_count = 0, pcf_count = 0; //gets printed out-> user can see, how many ICs of one type will be initialized
 
@@ -48,6 +45,24 @@ bool load_config()
 
   char *mcp_buf = new char[mcp_buf_size]; //char *mcp_buf = new char[mcp_buf_size];
   char *pcf_buf = new char[pcf_buf_size];
+
+  for (i = 0; i < MAX_IC_COUNT; i++) //reset every mcp struct-object
+  {
+    for (t = 0; t < 16; t++)
+    {
+      mcp_list[i].address[t] = new char[3];//allocate memory for 2 chars + null-terminator
+      strcpy(mcp_list[i].address[t], "-1");
+    }
+  }
+
+  for (i = 0; i < MAX_IC_COUNT; i++) //reset every pcf struct-object
+  {
+    for (t = 0; t < 5; t++)
+    {
+      pcf_list[i].address[t] = new char[3];//allocate memory for 2 chars + null-terminator
+      strcpy(pcf_list[i].address[t], "-1");
+    }
+  }
   
   readFile(LittleFS, "/mcp.txt", mcp_buf, mcp_buf_size);
   readFile(LittleFS, "/pcf.txt", pcf_buf, pcf_buf_size);
@@ -56,21 +71,27 @@ bool load_config()
   //parse data for mcp ICs
   //=======================================================
 
-  //i2c;pin;kanal;io;key;info
-  CSV_Parser mcp_parse(mcp_buf, "ucucsucss" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
+  //i2c;pin;kanal;io;key(not used);info
+
+  CSV_Parser mcp_parse(mcp_buf, "ucucsuc-s" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');  
   
   USBSerial.println();
   mcp_parse.print();
   
   uint8_t *i2c = (uint8_t*)mcp_parse["i2c"];
   uint8_t *pin = (uint8_t*)mcp_parse["pin"];
-  char **address = (char**)mcp_parse["kanal"]; //tcp: here used for outputs (leds and stuff)
-  uint8_t *io = (uint8_t*)mcp_parse["io"];      //theoreticly not needed -> rows with key are inputs, rows with tcp-addresses are outputs
-  char **key = (char**)mcp_parse["key"];        //used for inputs (buttons, switches, etc.), but also saved in mcp_list[].address[]
-
+  char **address = (char**)mcp_parse["kanal"];
+  uint8_t *io = (uint8_t*)mcp_parse["io"];
+  
   for (t = 0; t < mcp_parse.getRowsCount(); t++) 
   {
-    if (pin[t] < 0 || pin[t] > 15) //
+
+    if (i2c[t] < MCP_I2C_BASE_ADDRESS || i2c[t] > MCP_I2C_END_ADDRESS) //check if i2c address is in valid range
+    {
+      USBSerial.printf("\nI2C-Adresse liegt nicht zwischen %i und %i: %u", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, i2c[t]);
+      strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
+    }
+    else if (pin[t] < 0 || pin[t] > 15) //
     {
       USBSerial.printf("\nPin liegt nicht zwischen 0 und 15: %u", pin[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
@@ -80,46 +101,23 @@ bool load_config()
       USBSerial.printf("\nPin %u an IC mit Adresse %i (DEC) nicht in Verwendung.", pin[t], i2c[t]);
     }
     else {
+      //store address from config file in mcp_list and "connect" every given address with a specific pin in the struct.
+      //e.g. current column: 22, 02, 03, 1 (i2c, pin, address, io) 
+      //-> strcpy( mcp_list[22 - 20(MCP_I2C_BASE_ADDRESS)].address[2(pin)], 03 (actual address) )
 
-      //bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
+      strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
+      bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
       
-      //Store the key value in mcp_list's address array 
-      if (key[t] != nullptr)
-      {
-        //pin is a input
-        bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 1); 
-
-          // Allocate memory dynamically based on the length of the key value
-        size_t keyLength = strlen(key[t]) + 1; // +1 for null-terminator
-        mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
-        memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
-
-        // Copy the key value to the dynamically allocated memory
-        strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], key[t]);
+      //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
+      if (strcmp(address[t], "ac") == 0) {
+        acceleration_button[0] = i2c[t];
+        acceleration_button[1] = pin[t];
       }
-      else 
-      {
-        //pin is a output
-        bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 0); 
-
-        mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[3]; //address konsists of 2 digits and null-terminator 
-        memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', 3); // Clear the memory
-        
-        //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-        if (strcmp(address[t], "ac") == 0) {
-          acceleration_button[0] = i2c[t];
-          acceleration_button[1] = pin[t];
-        }
-        else if (strcmp(address[t], "dc") == 0) {
-          deceleration_button[0] = i2c[t];
-          deceleration_button[1] = pin[t];
-        }
-        else {    
-            // Copy the key value to the dynamically allocated memory
-            strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
-        }
+      else if (strcmp(address[t], "dc") == 0) {
+        deceleration_button[0] = i2c[t];
+        deceleration_button[1] = pin[t];
       }
-
+      
     }
 
      if (t == mcp_parse.getRowsCount()-1) //end of file reached
@@ -140,8 +138,9 @@ bool load_config()
   //=======================================================
 
   USBSerial.print(F("\nLese Konfigurationsdatei \"pcf.txt\"...\n"));
-  
-  CSV_Parser pcf_parse(pcf_buf, "ucucsss" /*uc: unsigned char, s: string*/, /*has header*/true, /*custom delimiter*/';');
+  //i2c;pin;kanal;key;info
+
+  CSV_Parser pcf_parse(pcf_buf, "ucucs-s" /*uc: unsigned char, s: string*/, /*has header*/true, /*custom delimiter*/';');
  
   USBSerial.println();
   pcf_parse.print();
@@ -149,7 +148,6 @@ bool load_config()
   i2c = (uint8_t*)pcf_parse["i2c"];
   pin = (uint8_t*)pcf_parse["pin"];
   address = (char**)pcf_parse["kanal"];
-  key = (char**)pcf_parse["key"];
 
   for (t = 0; t < pcf_parse.getRowsCount(); t++)
   {
@@ -163,31 +161,15 @@ bool load_config()
       USBSerial.printf("\nPin %u an IC mit Adresse %i (DEC) nicht in verwendung.", pin[t], i2c[t]);
     }
     else {
-      //Store the key value in pcf_list's address array 
-      if (key[t] != nullptr)
-      {
-          // Allocate memory dynamically based on the length of the key value
-        size_t keyLength = strlen(key[t]) + 1; // +1 for null-terminator
-        pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
-        memset(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
+      strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]); 
 
-        // Copy the key value to the dynamically allocated memory
-        strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], key[t]);
+      //custom address for combined throttle, where direction is indicated by two buttons 
+      //for seperated actuators use regular configuration with specific address
+      if (strcmp(address[t], "ct") == 0) {
+        combined_throttle_pin[0] = i2c[t];
+        combined_throttle_pin[1] = pin[t]; 
       }
-      else {
-        pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]] = new char[3]; //address konsists of 2 digits and null-terminator 
-        memset(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], '\0', 3); // Clear the memory
         
-
-        if (strcmp(address[t], "ct") == 0) {
-          combined_throttle_pin[0] = i2c[t];
-          combined_throttle_pin[1] = pin[t]; 
-        }
-        else {    
-            // Copy the key value to the dynamically allocated memory
-            strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
-        }
-      } 
     }
 
     if (t == pcf_parse.getRowsCount() - 1)
@@ -204,9 +186,6 @@ bool load_config()
   
   USBSerial.printf("pcf_count: %i\n\n", pcf_count);
 
-  //=======================================================
-  //init ICs
-  //=======================================================
 
   for (i = 0; i < MAX_IC_COUNT; i++) 
   {
@@ -258,15 +237,15 @@ bool load_config()
   return 1;
 }
 
-/*
-==========================================================================================================================
-==========================================================================================================================
-==========================================================================================================================
-==========================================================================================================================
 
-//helper-functions for opt7() to store current config in flash
- need adjustment for on_key and off_key
-*/
+//==========================================================================================================================
+//==========================================================================================================================
+//==========================================================================================================================
+//==========================================================================================================================
+
+//helper-functions for opt7() to store current config in flash (changes by user are temporary - to save them, user has to call this function)
+
+
 
 static void mcp_Config2CsvString(uint8_t i2c_adr, uint8_t pin, char *buffer) 
 {
@@ -315,13 +294,15 @@ static void pcf_Config2CsvString(uint8_t i2c_adr, uint8_t pin, char *buffer)
 
 }
 
+
 //==========================================================================================================================
 //resume input tasks and print out infos for the user
 //==========================================================================================================================
 
 static void opt_1() 
 {
-    USBSerial.print(F("loksim config"));
+    config_menu = 1;  //set flag to return to menu after this function
+    USBSerial.print(F("trainsim config"));
     USBSerial.print(F("Sie können jetzt einen beliebigen Taster/Schalter/Hebel betätigen."));
     USBSerial.print(F("\nUm wieder zurück zum Menü zu gelangen, geben Sie ein \"C\" ein.\n"));    
 
@@ -334,6 +315,7 @@ static void opt_1()
     vTaskSuspend(Task1);
     vTaskSuspend(Task2);
     vTaskSuspend(Task5);
+
 }
 
 //==========================================================================================================================
@@ -343,6 +325,7 @@ static void opt_1()
 static void opt_2() 
 {
     int i, t;
+    config_menu = 1;
 
     USBSerial.print(F("Die Ausgabe erfolgt sortiert nach der I2C-Adresse (DEC nicht HEX!).\nEs werden erst alle MCP-konfigurationen gelistet gefolgt von denen der PCF-ICs.\n"));
 
@@ -492,6 +475,7 @@ static void opt_4()
   char *buffer = new char[3]{'\0'};     //buffer for user-input 
   char current_address[3] = {'\0'};        
   char info[250] = {'\0'};               //info for user, if input didnt fit to request, static array, because there is enough memory, but memory allocation costs cpu cycles
+
 
   USBSerial.print(F("Sie können jederzeit zum Menü zurückgelangen. Geben Sie dazu ein \"C\" ein."));
   USBSerial.printf("\nGeben Sie die I2C-Addresse des ICs ein, dessen Port-Konfiguration Sie ändern möchten (%i-%i & %i-%i (DEC)): ", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS);   
@@ -778,11 +762,11 @@ static void opt_6()
     if(VERBOSE) 
     {
         VERBOSE = 0;
-        USBSerial.print(F("Debugging-Ausgabe ausgeschaltet."));
+        USBSerial.print(F("Debugging-Ausgabe ausgeschaltet.\n"));
     } 
     else {
         VERBOSE = 1;
-        USBSerial.print(F("Debugging-Ausgabe eingeschaltet."));
+        USBSerial.print(F("Debugging-Ausgabe eingeschaltet.\n"));
     }
     config_menu = 1;
 }
@@ -877,6 +861,11 @@ static void opt_7()
 }
 
 //==========================================================================================================================
+//opt 8: exit menu
+//opt 9: restart device
+//==========================================================================================================================
+
+//==========================================================================================================================
 //change variable in eeprom, which is used to determine which interface is used
 //==========================================================================================================================
 
@@ -906,7 +895,9 @@ static void opt_10()
   {
     preferences.putUInt("app_setting", option);
     USBSerial.print(F("\nLokSim3D Schnittstelle wird nach dem nächsten Neustart geladen."));
-  } 
+  }
+ 
+  USBSerial.printf("In NVS gepeichert: %i", preferences.getUInt("app_setting", 0));
   preferences.end();
 
   if (option) config_menu = 1; //return to menu, where user can reset the device with option 9
@@ -919,11 +910,10 @@ static void opt_10()
 //==========================================================================================================================
 static void esc()  
 {
-  USBSerial.read();
-  vTaskResume(::Task1);
-  vTaskResume(::Task2);
+  vTaskResume(Task1);
+  vTaskResume(Task2);
   vTaskResume(Task4);
-  vTaskResume(::Task5);
+  vTaskResume(Task5);
   vTaskSuspend(NULL);
   
 }
@@ -946,7 +936,7 @@ void serial_config_menu()
     while (USBSerial.available() > 0) {USBSerial.read();}
 
     config_menu = 0; 
-
+     
     USBSerial.print(F("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"));
     USBSerial.print(F("\nUm Änderungen dauerhaft im Flash-Speicher zu sichern, muss das Konfigurationsmenü über die Option 7 beendet werden. Bei einem Neustart werden ungesicherte Änderungen verworfen.\n"));
     USBSerial.print(F("Auswahlmöglichkeiten zur Fehlersuche und Konfiguration des Fahrpults: \n\n"));  
@@ -966,9 +956,11 @@ void serial_config_menu()
     USBSerial.print(F("10 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n\n\n\n"));
 
     strcpy(info, "Diese Option steht nicht zur verfügung.\nGeben Sie eine der Verfügbaren Optionen ein, oder beenden Sie mit \"C\" das Konfigurationsmenü.\n");
-    if (process_UserInput(buffer, &option, 2, 1, 11, info)) option = 8; //exit menu, if user entered "C"
-    delete[] buffer;
-
+    if (process_UserInput(buffer, &option, 2, 1, 11, info)) option = 8;   //exit menu, if user entered "C"
+    
+    USBSerial.printf("\nOption: %i\n", option);
+    delete[] buffer;    //dead variable, not used 
+    
     USBSerial.print("\n\n\n\n\n\n\n\n");
     USBSerial.print("-------------------------------------------------");
     USBSerial.print("-------------------------------------------------\n\n");
@@ -997,12 +989,11 @@ void serial_config_menu()
             opt_7();
             break;
         case 8: 
-
             break;
         case 9: 
             ESP.restart();
             break;
-        case 10:
+        case 10: 
             opt_10();
             break;
         default:
@@ -1022,4 +1013,5 @@ void serial_config_menu()
     }
 }
 
-}; //namespace ConfigMenu
+
+};

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTILS_H
+#define UTILS_H
 
 #include "Arduino.h"
 #include <config.h>
@@ -6,22 +7,19 @@
 #include <USB.h>
 #include <USBHIDKeyboard.h>
 
-void USB_Event_Callback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
-/**
-*
-*funktion like sprintf(). prints a formatted string to a queue, instead of a c-String variable
-*used for verbose output and 
-*/
+void USB_Event_Callback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data); //debugging
+
+//==============================================================================================
+//funktion like sprintf(). prints a formatted string to a queue, instead of a c-String variable
+//used for verbose output and 
+//==============================================================================================
 
 void queue_printf(QueueHandle_t queue, const int size, const char *format, ...);
 
-/*
-*functions for file/data management
-*openFile() functions return a File object. 
-*This object supports all the functions of Stream, 
-*so you can use readBytes, findUntil, parseInt, println, and all other Stream methods
-*/ 
+//==============================================================================================
+//helperfunctions for config_file_utils
+//==============================================================================================
 
 size_t getFilesize(fs::FS &fs, const char* path);
 
@@ -31,4 +29,18 @@ void appendFile(fs::FS &fs, const char *path, const char *message);
 
 void clearFile(fs::FS &fs, const char *path);
 
+void printBinary(uint16_t value);
 
+bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound, uint upper_bound, char *info);
+
+//==============================================================================================
+//let user know that setup is finished
+//==============================================================================================
+void indicate_finished_setup();
+
+//==============================================================================================
+//print partitions to serial monitor 
+//==============================================================================================
+void find_and_print_partitions();
+
+#endif
