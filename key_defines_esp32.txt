@@ -1,4 +1,4 @@
-
+//just a lookup file
 #define KEY_LEFT_CTRL   0x80
 #define KEY_LEFT_SHIFT  0x81
 #define KEY_LEFT_ALT    0x82
