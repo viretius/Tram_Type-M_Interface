@@ -248,6 +248,7 @@ bool load_config()
 
     if(!pcf_list[i].enabled) { //no entry in csv file for this i2c address found
       continue;
+      //USBSerial.printf("pcf_list[%i].enabled: %i\n", i, pcf_list[i].enabled);
     }
    
     if (!pcf_list[i].pcf.begin(pcf_list[i].i2c)) {
@@ -737,7 +738,7 @@ static void opt_5()
       USBSerial.print(F("\nDie für diese Laufzeit gespeicherten Kanäle belieben weiterhin bestehen, bis das Gerät abgeschaltet wird oder die Änderungen dauerhaft gesichert werden.\n"));
       
     }
-    else if(new_pcf_count < pcf_count) //user wants to "delete" mcp ICs
+    else if(new_pcf_count < pcf_count) //user wants to "delete" pcf ICs
     {
       for (i = new_pcf_count; i < pcf_count; i++) 
       {
@@ -758,9 +759,9 @@ static void opt_5()
               pcf_list[i].pcf.enableDAC(false);
             
               xSemaphoreGive(i2c_mutex);
+              break; //break for loop
             }
             t++;
-            break;
           }
           if (i = MAX_IC_COUNT) USBSerial.print(F("\nDiese Adresse ist schon deaktiviert."));
         }
