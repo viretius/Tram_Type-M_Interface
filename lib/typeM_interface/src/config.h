@@ -22,6 +22,13 @@
 //various global variables and definitions
 //============================================================
 
+/*
+Arduino ESP32S3 Nano: 
+static constexpr uint8_t LED_RED = GPIO 46; (B0)
+static constexpr uint8_t LED_GREEN = GPIO 0; (B1)
+static constexpr uint8_t LED_BLUE = GPIO 45; 
+*/
+
 #define MAX_IC_COUNT 8
 #define interface_eeprom_address 0
 
@@ -70,7 +77,7 @@ extern bool run_config_task;
 
 /*
 * storing i2c address[0] and pin number[1]  
-* buttons to detect, which direction the throttle has been moved to
+* used to detect, which direction the throttle is beeing moved to
 */
 extern uint8_t acceleration_button[2]; 
 extern uint8_t deceleration_button[2];
@@ -87,6 +94,9 @@ extern QueueHandle_t serial_tx_info_queue;
 extern QueueHandle_t serial_tx_verbose_queue;
 
 extern SemaphoreHandle_t i2c_mutex;
+//============================================================
+//USB stuff
+//============================================================
 
 #if ARDUINO_USB_CDC_ON_BOOT
 #define HWSerial Serial0
@@ -102,8 +112,7 @@ extern USBCDC USBSerial;
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       USBSerial
 #define _ETHERNET_WEBSERVER_LOGLEVEL_       3
-
-//not using default SPI-pins for int and cs dont ask yourself why i dont know
+//not using default SPI-pins for int and cs
 #define INT_GPIO            17 
 #define CS_GPIO             18
 

@@ -70,14 +70,19 @@ bool load_config()
 
   for (t = 0; t < mcp_parse.getRowsCount(); t++) 
   {
-    if (pin[t] < 0 || pin[t] > 15) //
+    if (i2c[t] < MCP_I2C_BASE_ADDRESS || i2c[t] > MCP_I2C_END_ADDRESS) //check if i2c address is in valid range
     {
-      USBSerial.printf("\nPin liegt nicht zwischen 0 und 15: %u", pin[t]);
+      USBSerial.printf("I2C-Adresse liegt nicht zwischen %i und %i: %u\n", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, i2c[t]);
+      strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
+    }
+    else if (pin[t] < 0 || pin[t] > 15) //
+    {
+      USBSerial.printf("Pin liegt nicht zwischen 0 und 15: %u\n", pin[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
     }
     else if (strcmp(address[t], "-1") == 0) 
     {
-      USBSerial.printf("\nPin %u an IC mit Adresse %i (DEC) nicht in Verwendung.", pin[t], i2c[t]);
+      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
     }
     else {
 
@@ -153,14 +158,19 @@ bool load_config()
 
   for (t = 0; t < pcf_parse.getRowsCount(); t++)
   {
+    if (i2c[t] < PCF_I2C_BASE_ADDRESS || i2c[t] > PCF_I2C_END_ADDRESS) //check if i2c address is in valid range
+    {
+      USBSerial.printf("I2C-Adresse liegt nicht zwischen %i und %i: %u\n", PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, i2c[t]);
+      strcpy(mcp_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
+    }
     if (pin[t] < 0 || pin[t] > 4) //
     {
-      USBSerial.printf("\nPin liegt nicht zwischen 0 und 4: %u", pin[t]);
+      USBSerial.printf("Pin liegt nicht zwischen 0 und 4: %u\n", pin[t]);
       strcpy(pcf_list[i2c[t]-PCF_I2C_BASE_ADDRESS].address[pin[t]], "-1");   
     }
     else if (strcmp(address[t], "-1") == 0) 
     {
-      USBSerial.printf("\nPin %u an IC mit Adresse %i (DEC) nicht in verwendung.", pin[t], i2c[t]);
+      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in verwendung.\n", pin[t], i2c[t]);
     }
     else {
       //Store the key value in pcf_list's address array 
@@ -679,13 +689,17 @@ static void opt_5()
   }
   else if (option == 2) 
   {
+    USBSerial.print(F("\nGeben Sie die gewünschte Zahl an PCF-ICs an. (max. 8)\n"));
+    strcpy(info, "\nDiese Zahl an PCF-ICs ist nicht umsetzbar. Geben Sie eine Zahl von 0 bis 8 ein, oder kehren Sie mit \"C\" zurück zum Menü.");
+    if (process_UserInput(buffer, &new_pcf_count, 1, 0, 8, info)) return;
+
     if (new_pcf_count > pcf_count) 
     {
       USBSerial.print(F("Freie I2C Adressen: "));
       for(i = 0; i < MAX_IC_COUNT; i++) 
       {
         if (pcf_list[i].enabled) continue;
-        USBSerial.printf("%i (%02x), ", i + MCP_I2C_BASE_ADDRESS, i + MCP_I2C_BASE_ADDRESS);
+        USBSerial.printf("%i (%02x), ", i + PCF_I2C_BASE_ADDRESS, i + PCF_I2C_BASE_ADDRESS);
         count++;
       }
       
@@ -733,7 +747,7 @@ static void opt_5()
         while (t < count) //give free addresses to "new" mcp ICs
         {
           USBSerial.print(F("\nGeben Sie die Adresse ein, die Sie deaktivieren möchten, oder kehren Sie mit \"C\" zurück zum Menü.\nKanalnummern und Portkonfiguration werden nicht zurückgesetzt.\nDeaktivierte ICs werden nicht im Flashspeicher gesichert."));
-          if (process_UserInput(buffer, &enable_i2c_adr, 1, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return;
+          if (process_UserInput(buffer, &enable_i2c_adr, 2, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
           for (i = 0; i < MAX_IC_COUNT; i++) //does userinput match a free address?
           {
             if (!pcf_list[i].enabled || pcf_list[i].i2c != enable_i2c_adr) continue;
