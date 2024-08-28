@@ -18,7 +18,7 @@ TaskHandle_t Task1;   //digital input
 TaskHandle_t Task2;   //analog input
 TaskHandle_t Task3;   //output
 TaskHandle_t Task4;   //serial rx / tcp rx
-TaskHandle_t Task5;   //serial tx 
+TaskHandle_t Task5;   //serial tx / keyboard tx
 TaskHandle_t Task6;   //config menu
 
 QueueHandle_t serial_tx_info_queue;
