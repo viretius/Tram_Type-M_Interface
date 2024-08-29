@@ -266,19 +266,174 @@ bool load_config()
   delete[] pcf_buf;
   delete[] mcp_buf; 
 
+  //=======================================================
+  //load network settings
+  //=======================================================
+
+  uint8_t ip[4] = {0, 0, 0, 0};
+  preferences.begin("lokSim3D_net", false);
+
+    ip[0] = preferences.getUInt("ip1", 169);
+    ip[1] = preferences.getUInt("ip2", 254);
+    ip[2] = preferences.getUInt("ip3", 227);
+    ip[3] = preferences.getUInt("ip4", 2);
+    host = IPAddress(ip[0], ip[1], ip[2], ip[3]);
+
+    port = preferences.getUInt("port", 1435);
+    preferences.getBytes("mac", mac, 6);
+  preferences.end();
+  
+  USBSerial.printf("\n\nPort: %u\n", port);
+  USBSerial.printf("MAC-Adresse: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  USBSerial.printf("IP-Adresse: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+  
+
+
   return 1;
 }
 
 /*
 ==========================================================================================================================
 ==========================================================================================================================
-==========================================================================================================================
-==========================================================================================================================
+*/
+//==========================================================================================================================
+//let user enter ip address
+//==========================================================================================================================
+
+static void process_IPInput() 
+{
+  char *buffer = new char[16]{'\0'}; //12 digits + 3 seperators(.) + null-terminator
+  char info[250];        //info for user, if input didnt fit to request
+  uint8_t ip[4] = {0, 0, 0, 0};
+  uint8_t i = 0, t = 0;
+  
+  while (USBSerial.available()) USBSerial.read();
+  USBSerial.print(F("\nGeben Sie jetzt die neue IPV4 Adresse im gängigen Format ein oder kehren sie mit \"C\" zurück zum Menü.\n"));
+
+  //1: read input
+  while(!USBSerial.available()) {vTaskDelay(1);} 
+  if (USBSerial.peek() == 'C') return;     
+
+  int bytesRead = 0;
+  while (USBSerial.available()) 
+  {
+    bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, 16 - bytesRead); //max 16 bytes, but user could enter less. e.g. 192.168.4.1
+    if (bytesRead > 0 || buffer[0] == '\n') break;
+    vTaskDelay(1); 
+  }
+  buffer[bytesRead] = '\0'; 
+  
+  //2: validate input as ipv4 address:
+  char *token = strtok(buffer, ".");
+  while (token != NULL) 
+  {
+    ip[i] = atoi(token); //returs 0 if token is not a number
+    //check if if token is a number
+    if (ip[i] == 0 && token[0] != '0') 
+    {
+      USBSerial.print(F("\nUngültige Eingabe. Bitte geben Sie nur Zahlen und Punkte ein.\n"));
+      process_IPInput();
+    }
+    //check boundaries
+    if (ip[i] < 0 || ip[i] > 255) 
+    {
+      USBSerial.print(F("\nUngültige Eingabe. Bitte geben Sie Zahlen zwischen 0 und 255 ein.\n"));
+      process_IPInput();
+    }
+    i++;
+    token = strtok(NULL, ".");
+  }
+  if (i != 4) //check if 4 tuples have been entered
+  {
+    USBSerial.print(F("\nUngültige Eingabe. Bitte geben Sie 4 Zahlen ein.\n"));
+    process_IPInput();
+  }
+
+  //3: ask user if input is correct
+  USBSerial.printf("\nIhre Eingabe: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+  USBSerial.print(F("\nIst diese Eingabe korrekt? (j/n)"));
+
+  while(!USBSerial.available()){vTaskDelay(1);}
+  memset(&buffer[0], '\0', 3); 
+  USBSerial.readBytesUntil('\n', buffer, 1); 
+  USBSerial.printf("\n%s", buffer);
+  if (strcmp(buffer, "j") == 0 || strcmp(buffer, "J") == 0)  
+  {
+    preferences.begin("lokSim3D_net", false);
+    preferences.putUInt("ip1", ip[0]);
+    preferences.putUInt("ip2", ip[1]);
+    preferences.putUInt("ip3", ip[2]);
+    preferences.putUInt("ip4", ip[3]);
+    preferences.end();
+    return;
+  }
+  USBSerial.println(F("\nEinstellung gespeichert.\nMenü wird erneut aufgerufen..."));
+  delete[] buffer;
+}
+
+
+//==========================================================================================================================
+//let user enter MAC address
+//==========================================================================================================================
+
+static void process_MACInput() 
+{
+  char *buffer = new char[12+5+1]{'\0'}; //12 digits + 5 seperators(:) + null-terminator
+  char info[250];        //info for user, if input didnt fit to request
+  byte _mac[6] = {0, 0, 0, 0, 0, 0};
+  uint8_t i = 0, t = 0;
+
+  while (USBSerial.available()) USBSerial.read();
+  USBSerial.print(F("\nGeben Sie jetzt die neue MAC-Adresse im Format XX:XX:XX:XX:XX:XX ein oder kehren sie mit \"C\" zurück zum Menü.\n"));
+
+  //1: read input
+  while(!USBSerial.available()) {vTaskDelay(1);}
+  if (USBSerial.peek() == 'C') return;
+  USBSerial.readBytesUntil('\n', buffer, 18);
+
+  //2: validate input as MAC address:
+  char *token = strtok(buffer, ":");
+  while(token != NULL) 
+  {
+    //check if if token is a hex number
+    if (sscanf(token, "%hhx", &_mac[i]) != 1) 
+    {
+      USBSerial.print(F("\nUngültige Eingabe. Bitte geben Sie nur Hexadezimalzahlen und Doppelpunkte ein.\n"));
+      process_MACInput(); 
+    }
+    i++;
+    token = strtok(NULL, ":");
+  }
+  if (i != 6) //check if 4 tuples have been entered
+  {
+    USBSerial.print(F("\nUngültige Eingabe. Bitte geben Sie 6 Zahlen ein.\n"));
+    process_MACInput(); 
+  }
+
+  //3: ask user if input is correct
+
+  USBSerial.printf("\nIhre Eingabe: %02X:%02X:%02X:%02X:%02X:%02X\n", _mac[0], _mac[1], _mac[2], _mac[3], _mac[4], _mac[5]);
+  USBSerial.print(F("\nIst diese Eingabe korrekt? (j/n)"));
+
+  while(!USBSerial.available()){vTaskDelay(1);}
+  memset(&buffer[0], '\0', 3); 
+  USBSerial.readBytesUntil('\n', buffer, 1); 
+  USBSerial.printf("\n%s", buffer);
+  if (strcmp(buffer, "j") == 0 || strcmp(buffer, "J") == 0) 
+  {
+    preferences.begin("lokSim3D_net", false);
+    preferences.putBytes("mac", _mac, 6);
+    preferences.end();
+    USBSerial.println(F("\nEinstellung gespeichert.\nMenü wird erneut aufgerufen..."));
+    return;
+  }
+  delete[] buffer;
+  process_MACInput();
+
+}
+
 
 //helper-functions for opt7() to store current config in flash
- need adjustment for on_key and off_key
-*/
-
 static void mcp_Config2CsvString(uint8_t i2c_adr, uint8_t pin, char *buffer) 
 {
 
@@ -335,6 +490,8 @@ static void opt_1()
     USBSerial.print(F("loksim config"));
     USBSerial.print(F("Sie können jetzt einen beliebigen Taster/Schalter/Hebel betätigen."));
     USBSerial.print(F("\nUm wieder zurück zum Menü zu gelangen, geben Sie ein \"C\" ein.\n"));    
+
+    run_config_task = true; 
 
     vTaskResume(Task1);
     vTaskResume(Task2);
@@ -394,17 +551,17 @@ static void opt_2()
 
 static void opt_3() 
 {
+  char *buffer = new char[17]{'\0'};
   int i, t;
-  uint8_t i2c_adr, pin;
-  char *buffer = new char[17]{'\0'}; //16bits + null-terminator
+  int i2c_adr, pin;
   char info[250];        //info for user, if input didnt fit to request, static array, because there is enough memory, but memory allocation costs cpu cycles
-  uint8_t option;
+  int option;
 
   USBSerial.print(F("\nSie können jederzeit zum Menü zurückgelangen. Geben Sie dazu ein \"C\" ein."));   
 
   USBSerial.printf("\nGeben Sie die I2C-Addresse (%i bis %i) des MCP-ICs ein, dessen Port-Konfiguration Sie ändern möchten.", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS);  
   strcpy(info, "\nDiese Adresse steht nicht zur verfügung.\nGeben Sie eine passende Adresse ein, oder kehren Sie mit \"C\" zurück zum Menü.\n");
-  if (process_UserInput(buffer, &i2c_adr, 2, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return; 
+  if (get_integer_with_range_check(&i2c_adr, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return; 
 
   USBSerial.print(F("\n\nAktuelle Portkonfiguration:\n")); 
   for (i = 0; i < MAX_IC_COUNT; i++) {
@@ -415,7 +572,7 @@ static void opt_3()
   memset(&buffer[0], '\0', 17); //clear buffer
   USBSerial.print(F("\n\nUm die Portkonfiguration dieses ICs zu ändern, geben Sie eine \"1\" ein. Um nur einen einzelnen Pin anzupassen, geben Sie eine \"2\" ein."));
   strcpy(info, "\nDiese Option steht nicht zur verfügung.\nGeben Sie eine \"1\" oder eine \"2\" ein, oder kehren Sie mit \"C\" zurück zum Menü.\n");
-  if (process_UserInput(buffer, &option, 1, 1, 2, info)) return;
+  if (get_integer_with_range_check(&option, 1, 2, info)) return;
 
   if (option == 1) 
   {
@@ -428,7 +585,11 @@ static void opt_3()
     else 
     { 
       USBSerial.readBytesUntil('\n', buffer, 16);
-      mcp_list[i].portMode = (uint16_t)strtol(buffer, NULL, 2); //convert with base 2 instead of using portMode variable
+      for (t = 0; t < 16; t++) 
+      {
+       buffer[t] = (buffer[t] == '1') ? '1':'0'; //replace all characters that are not '1' with '0'
+       buffer[t] == '1' ? bitSet(mcp_list[i].portMode, t) : bitClear(mcp_list[i].portMode, t); //set or clear bit
+      }
     }    
     USBSerial.print(F("\nPortkonfiguration geändert zu: \n"));
     printBinary(mcp_list[i].portMode);
@@ -439,38 +600,36 @@ static void opt_3()
     USBSerial.print(F("\nGeben sie eine Nummer von 0 bis 15 für den Pin ein, den Sie ändern möchten.\n"));  
     memset(&buffer[0], '\0', 17); //clear buffer
     strcpy(info, "\nDiesen Pin gibt es nicht\nGeben sie eine Nummer von 0 bis 15 für den Pin ein, den Sie ändern möchten oder kehren Sie mit \"C\" zurück zum Menü.\n");
-    if (process_UserInput(buffer, &pin, 2, 0, 15, info)) return;
+    if (get_integer_with_range_check(&pin, 0, 15, info)) return;
     USBSerial.printf("\nPin %i wird umgestellt von %i", pin, (CHECK_BIT(mcp_list[i].portMode, pin) ? 1:0));
     
     bitWrite(mcp_list[i].portMode, pin, !CHECK_BIT(mcp_list[i].portMode, pin)); //toggle bit
 
   }
-  //mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_B, 0x00);  //Reset ports
  
   USBSerial.printf(" auf %i\n", (CHECK_BIT(mcp_list[i].portMode, pin) ? 1:0));
 
   USBSerial.printf("mcp_list[i].portMode: ");
   printBinary(mcp_list[i].portMode);
 
-  USBSerial.printf("Setting portMode for Port A: ");
-  printBinary(mcp_list[i].portMode & 0x00FF);
-
   if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
   { 
-          
-    mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_A, 0x00);
+
+    USBSerial.printf("Setting portMode for Port A: ");
+    printBinary(mcp_list[i].portMode & 0x00FF);      
     mcp_list[i].mcp.portMode(MCP23017Port::A, mcp_list[i].portMode & 0x00FF); //input_pullups enabled by default, portA: LSB
+    mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_A, 0x00);
     USBSerial.println("portA set");
 
-    vTaskDelay(1);
+    //vTaskDelay(1);
 
     USBSerial.printf("\nSetting portMode for Port B: ");
     printBinary((mcp_list[i].portMode >> 8) & 0x00FF);
-
-    mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_B, 0x00);
     mcp_list[i].mcp.portMode(MCP23017Port::B, (mcp_list[i].portMode >> 8) & 0x00FF); //portB: MSB
+    mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_B, 0x00);  //Reset ports
     USBSerial.println("portB set");
     
+    vTaskDelay(pdMS_TO_TICKS(1));
     mcp_list[i].last_reading = mcp_list[i].mcp.read();
     
     xSemaphoreGive(i2c_mutex);
@@ -485,7 +644,7 @@ static void opt_3()
   USBSerial.readBytesUntil('\n', buffer, 1); 
   buffer[1] = '\0';
   USBSerial.printf("\n%s", buffer);
-  if (strcmp(buffer, "j") == 0) config_menu = 1;
+  if (strcmp(buffer, "j") == 0) run_config_task = 1;
   delete[] buffer;
   
 }
@@ -497,24 +656,24 @@ static void opt_3()
 static void opt_4() 
 {
   uint8_t i, t;
-  uint8_t i2c_adr;
-  uint8_t pin;
-  uint8_t address;
+  int i2c_adr;
+  int pin;
+  int new_address;
   char *buffer = new char[3]{'\0'};     //buffer for user-input 
   char current_address[3] = {'\0'};        
   char info[250] = {'\0'};               //info for user, if input didnt fit to request, static array, because there is enough memory, but memory allocation costs cpu cycles
 
+
   USBSerial.print(F("Sie können jederzeit zum Menü zurückgelangen. Geben Sie dazu ein \"C\" ein."));
   USBSerial.printf("\nGeben Sie die I2C-Addresse des ICs ein, dessen Port-Konfiguration Sie ändern möchten (%i-%i & %i-%i (DEC)): ", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS);   
   strcpy(info, "\nDiese Adresse steht nicht zur verfügung.\nGeben Sie eine passende Adresse ein, oder kehren Sie mit \"C\" zurück zum Menü.\n");
-  memset(&buffer[0], '\0', 3);
   while (1)  //let user input some valid i2c adress or "C" to return back to the menu. if user entered a valid address, search the index in the lists where this adress is lokated at
   {  
-    if (process_UserInput(buffer, &i2c_adr, 2, MCP_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
+    if (get_integer_with_range_check(&i2c_adr, MCP_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
     
     i = i2c_adr - MCP_I2C_BASE_ADDRESS; //assume, entered address belongs to an mcp ic, i = index in mcp_list 
     if (i < 9) {break;} else { i = i2c_adr - PCF_I2C_BASE_ADDRESS;} //yes? break while loop otherwhise check if it belongs to pcf ic (i = unsigned! cant be < 0)
-    if (i < 9)  break; //yes? break, otherwhise go back to process_UserInput (user entered a number between 40 and 71)
+    if (i < 9)  break; //yes? break, otherwhise go back to get_integer_with_range_check (user entered a number between 40 and 71)
 
     USBSerial.printf("%s", info);
   }
@@ -525,65 +684,62 @@ static void opt_4()
   {
     USBSerial.print(F("\nDabei entspricht eine Nummer von 0 bis 7 einem Pin an Port A. Höhere Nummern entsprechen einem Pin an Port B.\n Achtung! Es wird nicht überprüft, ob derselbe Kanal schon bei einem anderen I/O verwendet wird!\n")); 
     strcpy(info,  "\nDiesen Pin gibt es nicht\nGeben sie eine Nummer von 0 bis 15 für den Pin ein, den Sie ändern möchten oder kehren Sie mit \"C\" zurück zum Menü.\n");
-    memset(&buffer[0], '\0', 3);
-    if (process_UserInput(buffer, &pin, 2, 0, 15, info)) return; 
+    if (get_integer_with_range_check(&pin, 0, 15, info)) return; 
 
     strcpy(current_address, mcp_list[i].address[pin]);
     USBSerial.printf("\n\nAktuell ist für diesen I/O Kanal %s hinterlegt.\nGeben Sie jetzt eine neue Kanalnummer ein:", current_address);
     memset(&buffer[0], '\0', 3);
     strcpy(info,  "\nDiese Kanalnumer gibt es nicht\nGeben sie eine Nummer von 0 bis 99 ein oder kehren Sie mit \"C\" zurück zum Menü.\n");
-    if (process_UserInput(buffer, &address, 2, 0, 99, info)) return;
+    if (get_integer_with_range_check(&new_address, 0, 99, info)) return;
 
+    itoa(new_address, buffer, 10); //convert int to string
     strncpy(mcp_list[i].address[pin], buffer, 2); //write new address to mcp list
+    
 
   } else if (i2c_adr > PCF_I2C_BASE_ADDRESS) //pcf ic
   {
     USBSerial.print(F("\nDabei entspricht eine Nummer von 0 bis 3 einem der 4 analogen Eingänge. Eine 4 führt entsprechend zur Änderung des Kanals des analogen Ausgangs.\nAchtung! Es wird nicht überprüft, ob derselbe Kanal schon bei einem anderen I/O verwendet wird!\n"));
     memset(&buffer[0], '\0', 3);
     strcpy(info,  "\nDiesen Pin gibt es nicht\nGeben sie eine Nummer von 0 bis 4 für den Pin ein, den Sie ändern möchten oder kehren Sie mit \"C\" zurück zum Menü.\n");
-    if (process_UserInput(buffer, &pin, 3, 0, 4, info)) return;
+    if (get_integer_with_range_check(&pin, 0, 4, info)) return;
     strcpy(current_address, pcf_list[i].address[pin]);
 
     USBSerial.printf("\n\nAktuell ist für diesen I/O Kanal %s hinterlegt.\nGeben Sie jetzt eine neue Kanalnummer ein.", current_address);
     memset(&buffer[0], '\0', 3);
-    strcpy(info,  "\nDiese Kanalnumer gibt es nicht\nGeben sie eine Nummer von 0 bis 99 ein oder kehren Sie mit \"C\" zurück zum Menü.\n");
-    if (process_UserInput(buffer, &address, 2, 0, 99, info)) return;
+    strcpy(info,  "\nDiese Kanalnumer gibt es nicht\nGeben sie eine Nummer von - bis 99 ein oder kehren Sie mit \"C\" zurück zum Menü.\n");
+    if (get_integer_with_range_check(&new_address, -1, 99, info)) return;
 
-    strcpy(pcf_list[i].address[pin], buffer);
+    itoa(new_address, buffer, 10); //convert int to string
+    strncpy(pcf_list[i].address[pin], buffer, 2);
   }
     
   USBSerial.print(F("\n\nKanalnummer erfolgreich aktualisiert.\n"));
-  memset(&buffer[0], '\0', 3);
  
-   //clear hw rx buffer
   while (USBSerial.available()) {USBSerial.read();}
   USBSerial.print(F("\nMenü erneut aufrufen? (j/n)"));
   USBSerial.print(F("\n(Eine andere Eingabe als j wird als Nein interpretiert)\n"));
-
   while(!USBSerial.available()){vTaskDelay(1);}
+
   memset(&buffer[0], '\0', 3); 
-  USBSerial.readBytesUntil('\n', buffer, 2); 
-  buffer[1] = '\0';
+  USBSerial.readBytesUntil('\n', buffer, 1); 
   USBSerial.printf("\n%s", buffer);
-  if (strcmp(buffer, "j") == 0) config_menu = 1;
+  if (strcmp(buffer, "j") == 0) run_config_task = 1;
   delete[] buffer;
 }
 
 //==========================================================================================================================
 //change number of ICs
 //==========================================================================================================================
-
 static void opt_5() 
 { 
-  char *buffer = new char[3]{'\0'}; 
   char info[250];        //info for user, if input didnt fit to request, static array, because there is enough memory, but memory allocation costs cpu cycles
   int mcp_count = 0;
   int pcf_count = 0;
 
   uint8_t i, t, count;  //counter for number of free i2c addresses
-  uint8_t new_mcp_count = 0, new_pcf_count = 0; //user input
-  uint8_t option;  //M -> change num of mcp ics, P-> change num of pcf ics
-  uint8_t enable_i2c_adr; //user enteres multiple addresses he wants to add;
+  int new_mcp_count = 0, new_pcf_count = 0; //user input
+  int option;  //M -> change num of mcp ics, P-> change num of pcf ics
+  int enable_i2c_adr; //user enteres multiple addresses he wants to add;
 
   for (i = 0; i < MAX_IC_COUNT; i++) 
   {
@@ -597,14 +753,14 @@ static void opt_5()
   USBSerial.print(F("\nAchtung! Bei neuen ICs werden alle Kanäle mit \"-1\" initialisiert.\nWird die Anzahl an ICs verringert, werden die Kanalnummern des entsprechenden ICs ebenfalls auf \"-1\" zurückgesetzt."));
   
   strcpy(info,  "\nDiese Option steht nicht zur verfügung.\nGeben Sie eine \"1\" oder eine \"2\" ein, oder kehren Sie mit \"C\" zurück zum Menü.\n");
-  if (process_UserInput(buffer, &option, 1, 1, 2, info)) return;
+  if (get_integer_with_range_check(&option, 1, 2, info)) return;
   while (USBSerial.available() > 0) {USBSerial.read();}
   
   if (option == 1)
   {
     USBSerial.print(F("\nGeben Sie die gewünschte Zahl an Port Expandern an. (max. 8)\n"));
     strcpy(info, "\nDiese Zahl an Portexpandern ist nicht umsetzbar. Geben Sie eine Zahl von 0 bis 8 ein, oder kehren Sie mit \"C\" zurück zum Menü.");
-    if (process_UserInput(buffer, &new_mcp_count, 1, 0, 8, info)) return;
+    if (get_integer_with_range_check(&new_mcp_count, 0, 8, info)) return;
     
     if(new_mcp_count > mcp_count) //user wants to add mcp ICs
     {
@@ -622,7 +778,7 @@ static void opt_5()
       while (t < count) //give free addresses to "new" mcp ICs
       {
         USBSerial.printf("\nGeben Sie eine der freien Adressen ein, die sie für IC-Nr. %i vergeben möchten, oder kehren Sie mit \"C\" zurück zum Menü.\n", t+1);
-        if (process_UserInput(buffer, &enable_i2c_adr, 2, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return;
+        if (get_integer_with_range_check(&enable_i2c_adr, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return;
         for (i = 0; i < MAX_IC_COUNT; i++) //does userinput match a free address?
         {
           if (mcp_list[i].enabled || mcp_list[i].i2c != enable_i2c_adr) continue; 
@@ -666,7 +822,7 @@ static void opt_5()
         while (t < count) //give free addresses to "new" mcp ICs
         {
           USBSerial.print(F("\nGeben Sie die Adresse ein, die Sie deaktivieren möchten, oder kehren Sie mit \"C\" zurück zum Menü.\nDie Konfiguration bleiben zur Laufzeit erhalten.\nKonfigurationen deaktivierter ICs werden nicht im Flashspeicher gesichert."));
-          if (process_UserInput(buffer, &enable_i2c_adr, 1, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return;
+          if (get_integer_with_range_check(&enable_i2c_adr, MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, info)) return;
           for (i = 0; i < MAX_IC_COUNT; i++) //does userinput match a free address?
           {
             if (!mcp_list[i].enabled || mcp_list[i].i2c != enable_i2c_adr) continue;
@@ -692,7 +848,7 @@ static void opt_5()
   {
     USBSerial.print(F("\nGeben Sie die gewünschte Zahl an PCF-ICs an. (max. 8)\n"));
     strcpy(info, "\nDiese Zahl an PCF-ICs ist nicht umsetzbar. Geben Sie eine Zahl von 0 bis 8 ein, oder kehren Sie mit \"C\" zurück zum Menü.");
-    if (process_UserInput(buffer, &new_pcf_count, 1, 0, 8, info)) return;
+    if (get_integer_with_range_check(&new_pcf_count, 0, 8, info)) return;
 
     if (new_pcf_count > pcf_count) 
     {
@@ -710,7 +866,7 @@ static void opt_5()
       while (t < count) //give free addresses to "new" mcp ICs
       {
         USBSerial.printf("\nGeben Sie eine der freien Adressen ein, die sie für IC-Nr. %i vergeben möchten, oder kehren Sie mit \"C\" zurück zum Menü.\n", t+1);
-        if (process_UserInput(buffer, &enable_i2c_adr, 2, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
+        if (get_integer_with_range_check(&enable_i2c_adr, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
         for (i = 0; i < MAX_IC_COUNT; i++) //does userinput match a free address?
         {
           if (pcf_list[i].enabled || pcf_list[i].i2c != enable_i2c_adr) continue; 
@@ -748,7 +904,7 @@ static void opt_5()
         while (t < count) //give free addresses to "new" mcp ICs
         {
           USBSerial.print(F("\nGeben Sie die Adresse ein, die Sie deaktivieren möchten, oder kehren Sie mit \"C\" zurück zum Menü.\nKanalnummern und Portkonfiguration werden nicht zurückgesetzt.\nDeaktivierte ICs werden nicht im Flashspeicher gesichert."));
-          if (process_UserInput(buffer, &enable_i2c_adr, 2, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
+          if (get_integer_with_range_check(&enable_i2c_adr, PCF_I2C_BASE_ADDRESS, PCF_I2C_END_ADDRESS, info)) return;
           for (i = 0; i < MAX_IC_COUNT; i++) //does userinput match a free address?
           {
             if (!pcf_list[i].enabled || pcf_list[i].i2c != enable_i2c_adr) continue;
@@ -774,13 +930,13 @@ static void opt_5()
   while (USBSerial.available()) {USBSerial.read();}
   USBSerial.print(F("\nMenü erneut aufrufen? (j/n)"));
   USBSerial.print(F("\n(Eine andere Eingabe als j wird als Nein interpretiert)\n"));
-
   while(!USBSerial.available()){vTaskDelay(1);}
+
+  char *buffer = new char[3]{'\0'}; //16bits + null-terminator
   memset(&buffer[0], '\0', 3); 
   USBSerial.readBytesUntil('\n', buffer, 1); 
-  buffer[1] = '\0';
   USBSerial.printf("\n%s", buffer);
-  if (strcmp(buffer, "j") == 0) config_menu = 1;
+  if (strcmp(buffer, "j") == 0) run_config_task = 1;
   delete[] buffer;
 }
 
@@ -799,7 +955,7 @@ static void opt_6()
         VERBOSE = 1;
         USBSerial.print(F("Debugging-Ausgabe eingeschaltet."));
     }
-    config_menu = 1;
+    run_config_task = 1;
 }
 
 //==========================================================================================================================
@@ -897,17 +1053,14 @@ static void opt_7()
 
 static void opt_10() 
 {
-  char *buffer = new char[2];  
   char info[250] = {'\0'};
-  uint8_t option = 0;
+  int option = 0;
    
-  memset(&buffer[0], '\0', 2);
-
   USBSerial.print(F("Kehren Sie mit \"C\" zurück zum Menü.\n"));   
   USBSerial.print(F("Welche Schnittstelle soll nach dem nächsten Neustart geladen werden?\n\n1 -> SimMetro\n2 -> LokSim3D\n"));
 
   strcpy(info,  "\nDiese Option steht nicht zur verfügung.\nGeben Sie eine \"1\" oder eine \"2\" ein, oder kehren Sie mit \"C\" zurück zum Menü.\n");
-  if (process_UserInput(buffer, &option, 1, 1, 2, info)) return;
+  if (get_integer_with_range_check(&option, 1, 2, info)) return;
   
   preferences.begin("APP", false, "nvs");
 
@@ -924,44 +1077,75 @@ static void opt_10()
   } 
   preferences.end();
 
-  if (option) config_menu = 1; //return to menu, where user can reset the device with option 9
-  delete[] buffer;
+  if (option) run_config_task = 1; //return to menu, where user can reset the device with option 9
 }
 
+//==========================================================================================================================
+//Network settings
+//==========================================================================================================================
 
-//==========================================================================================================================
-//esc from menu
-//==========================================================================================================================
-static void esc()  
+static void opt_11() 
 {
-  USBSerial.read();
-  vTaskResume(::Task1);
-  vTaskResume(::Task2);
-  vTaskResume(Task4);
-  vTaskResume(::Task5);
-  vTaskSuspend(NULL);
-  
+  int option = 0;
+  char info[145];
+  char *buffer = new char[3]{'\0'}; //two chars and null-terminator
+
+  while (USBSerial.available() > 0) {USBSerial.read();}
+  run_config_task = 1; 
+
+  USBSerial.print(F("Was möchten Sie tun?\nAchtung! Änderungen an den Netzwerkeinstellungen können dazu führen, dass das Fahrpult nicht mehr erreichbar ist.\n Änderungen werden direkt gespeichert und sind nach einem Neustart aktiv.\n"));
+  USBSerial.print(F("1 -> Server-IP anpassen\n2 -> MAC-Adresse anpassen\n3 -> Port anpassen\nC -> Zurück zum Menü\n"));
+
+  strcpy(info, "Diese Option steht nicht zur verfügung.\nGeben Sie eine der Verfügbaren Optionen ein, oder beenden Sie mit \"C\" das Konfigurationsmenü.\n");
+  if (get_integer_with_range_check(&option, 1, 3, info)) return;   //exit menu, if user entered "C"
+
+  switch (option) 
+  {
+    case 1:
+      USBSerial.printf("\nAktuell gespeicherte Server-IP: %s\n", host.toString());
+      process_IPInput();
+      break;
+    case 2:
+        USBSerial.printf("\nAktuelle MAC-Adresse: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        process_MACInput();
+      break;
+    case 3:
+      USBSerial.printf("\nAktueller Port: %u", port);
+      USBSerial.read();
+      if (get_integer_with_range_check(&option, 0, INT16_MAX, info)) return;
+      preferences.begin("APP", false, "nvs");
+      preferences.putUInt("port", option);
+      USBSerial.printf("\nPort erfolgreich geändert auf %i", preferences.getUInt("port", 0)); //read back to check if it was saved correctly
+      preferences.end();
+      break;
+    default:
+      USBSerial.read();
+      USBSerial.print(F("Bitte eine Ziffer von 0 bis 9 für die entsprechende Option eingeben. Erneut versuchen, oder Konfiguration beenden? (j/n)"));
+      USBSerial.print(F("\n(Eine andere Eingabe als J wird als Nein interpretiert)\n"));
+      while(USBSerial.available() < 1) {vTaskDelay(1);}
+      if (strcmp(buffer, "j") == 0) run_config_task = 1;
+      break;
+  }
+
+  delete[] buffer; 
+
 }
+
 //==========================================================================================================================
 //USBSerial Configuration Menu
 //==========================================================================================================================
 
 void serial_config_menu()
 {
-    //suspend tasks to prevent data corruption
-    vTaskSuspend(Task1);      //digital input task
-    vTaskSuspend(Task2);      //analog input task
-    vTaskSuspend(Task4);      //USBSerial rx task     
-    vTaskSuspend(Task5);      //USBSerial tx task
 
-    uint8_t option = 0;
+    int option = 0;
     char info[145];
     char *buffer = new char[3]{'\0'}; //two chars and null-terminator
 
     while (USBSerial.available() > 0) {USBSerial.read();}
 
-    config_menu = 0; 
-
+    run_config_task = 0; 
+     
     USBSerial.print(F("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"));
     USBSerial.print(F("\nUm Änderungen dauerhaft im Flash-Speicher zu sichern, muss das Konfigurationsmenü über die Option 7 beendet werden. Bei einem Neustart werden ungesicherte Änderungen verworfen.\n"));
     USBSerial.print(F("Auswahlmöglichkeiten zur Fehlersuche und Konfiguration des Fahrpults: \n\n"));  
@@ -977,16 +1161,18 @@ void serial_config_menu()
     }
     USBSerial.print(F("7 -> Änderungen Speichern und Konfigurationsmenü beenden.\n"));
     USBSerial.print(F("8 -> Konfigurationsmenü beenden.\n"));
-    USBSerial.print(F("9 -> Neustart. Nicht gesicherte Änderungen gehen verloren!\n"));
-    USBSerial.print(F("10 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n\n\n\n"));
+    USBSerial.print(F("9 -> Neustart. Nicht gesicherte Änderungen (Ausgenommen Netzwerkkonfiguration) gehen verloren!\n"));
+    USBSerial.print(F("10 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n"));
+    USBSerial.print(F("11 -> Netzwerkeinstellungen ändern\n"));
 
     strcpy(info, "Diese Option steht nicht zur verfügung.\nGeben Sie eine der Verfügbaren Optionen ein, oder beenden Sie mit \"C\" das Konfigurationsmenü.\n");
-    if (process_UserInput(buffer, &option, 2, 1, 11, info)) option = 8; //exit menu, if user entered "C"
-    delete[] buffer;
-
-    USBSerial.print("\n\n\n\n\n\n\n\n");
+    if (get_integer_with_range_check(&option, 1, 11, info)) option = 8;   //exit menu, if user entered "C"
+    
+    delete[] buffer;    //dead variable, not used 
+    
+    USBSerial.print("\n\n");
     USBSerial.print("-------------------------------------------------");
-    USBSerial.print("-------------------------------------------------\n\n");
+    USBSerial.print("-------------------------------------------------\n\n\n");
 
     switch (option)
     {
@@ -1012,28 +1198,31 @@ void serial_config_menu()
             opt_7();
             break;
         case 8: 
-
             break;
         case 9: 
             ESP.restart();
             break;
-        case 10:
+        case 10: 
             opt_10();
+            break;
+        case 11:
+            opt_11();
             break;
         default:
             USBSerial.read();
             USBSerial.print(F("Bitte eine Ziffer von 0 bis 9 für die entsprechende Option eingeben. Erneut versuchen, oder Konfiguration beenden? (j/n)"));
             USBSerial.print(F("\n(Eine andere Eingabe als J wird als Nein interpretiert)\n"));
             while(USBSerial.available() < 1) {vTaskDelay(1);}
-            if (strcmp(buffer, "j") == 0) config_menu = 1;
+            if (strcmp(buffer, "j") == 0) run_config_task = 1;
             break;
     }
 
-    if (!config_menu) {
+    if (!run_config_task) {
       USBSerial.print(F("\nKonfigurationsmenü beendet.\nUm in das Konfigurationsmenü zu gelangen bitte \"M\" eingeben."));
       USBSerial.print(F("\n\n-------------------------------------------------"));
       USBSerial.print(F("-------------------------------------------------\n\n\n\n\n\n\n\n"));
-      esc();
+      run_config_task = 0;
+      //esc();
     }
 }
 

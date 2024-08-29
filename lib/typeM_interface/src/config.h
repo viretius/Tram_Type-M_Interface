@@ -72,8 +72,8 @@ typedef struct {
 extern MCP_Struct mcp_list[MAX_IC_COUNT]; 
 extern PCF_Struct pcf_list[MAX_IC_COUNT];
 
-extern uint8_t VERBOSE;
-extern bool run_config_task;
+extern uint8_t VERBOSE;           //0: no output, 1: infos, 
+extern bool run_config_task;      //if config task is running and user picked option 1, this variable is set to true and some infos are printed to serial monitor
 
 /*
 * storing i2c address[0] and pin number[1]  
@@ -119,11 +119,10 @@ extern USBCDC USBSerial;
 //include lib after defining SPI-pins
 #include <WebServer_ESP32_SC_W5500.h>
 
-//IPAddress myIP(192, 168, 2, 232);
-//IPAddress myGW(192, 168, 2, 1);
-//IPAddress mySN(255, 255, 255, 0);
-//Google DNS Server IP
-//IPAddress myDNS(8, 8, 8, 8);
+extern byte mac[]; 
+extern IPAddress host;
+//extern IPAddress client_ip; //has to be configured to match the server's IP address (to be implemented in config_file_utils)
+extern uint16_t port;               //default ZUSI port          
 
 
 #endif

@@ -1,18 +1,24 @@
 #include "config.h"
 
-Preferences preferences;
+byte mac[6]; 
+IPAddress host;                 
+//extern IPAddress client_ip;         
+uint16_t port;               //default ZUSI port          
 
+uint8_t VERBOSE;    
 bool config_menu;
-
-MCP_Struct mcp_list[MAX_IC_COUNT]; 
-PCF_Struct pcf_list[MAX_IC_COUNT];
-
-uint8_t VERBOSE;
 bool run_config_task;
 
 uint8_t acceleration_button[2];
 uint8_t deceleration_button[2];
 uint8_t combined_throttle_pin[2];
+
+
+Preferences preferences;
+
+MCP_Struct mcp_list[MAX_IC_COUNT]; 
+PCF_Struct pcf_list[MAX_IC_COUNT];
+
 
 TaskHandle_t Task1;   //digital input
 TaskHandle_t Task2;   //analog input

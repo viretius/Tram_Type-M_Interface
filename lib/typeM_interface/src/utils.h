@@ -31,7 +31,7 @@ void clearFile(fs::FS &fs, const char *path);
 
 void printBinary(uint16_t value);
 
-bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound, uint upper_bound, char *info);
+bool get_integer_with_range_check(int *var, uint lower_bound, uint upper_bound, char *info);
 
 //==============================================================================================
 //let user know that setup is finished

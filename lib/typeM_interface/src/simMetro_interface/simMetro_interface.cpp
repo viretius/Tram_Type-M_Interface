@@ -452,20 +452,35 @@ void config_task (void * pvParameters)
   for(;;)
   {
     vTaskDelay(5);
-
-    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) //every second
-    {
+    
+    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) {
       last_stackhighwatermark_print = xTaskGetTickCount();
       queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nconfig- Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
     }
+
+    //suspend tasks to prevent data corruption
+    vTaskSuspend(Task1);      //digital input task
+    vTaskSuspend(Task2);      //analog input task
+    vTaskSuspend(Task4);      //USBSerial rx task     
+    vTaskSuspend(Task5);      //USBSerial tx task
+
     serial_config_menu();  //tasks 1,2&5 can be resumed from within this function
+
+    if (!run_config_task) 
+    {
+      vTaskResume(Task1);
+      vTaskResume(Task2);
+      vTaskResume(Task4);
+      vTaskResume(Task5);
+      vTaskSuspend(NULL);
+    }
   }
 }
 
 //================================================================================================================
 //================================================================================================================
 void init() 
-  {
+{
 
     Wire.begin();
     while(!USBSerial);
@@ -510,6 +525,6 @@ void init()
     
     USBSerial.printf(("Tasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben."));
     
-  }
+} //init
 
 } //namespace trainSim_interface

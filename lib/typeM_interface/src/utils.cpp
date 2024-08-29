@@ -121,22 +121,20 @@ void printBinary(uint16_t value)
 }
 
 //==========================================================================================================================
-//let user enter a number with specific bounds
+//let user enter a number with specific bounds and max 16 digits
 //==========================================================================================================================
 
-bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound, uint upper_bound, char *info) //returns true (exit to menu) if user entered "C"
+bool get_integer_with_range_check (int *var, uint lower_bound, uint upper_bound, char *info) //returns true (exit to menu) if user entered "C"
 {  
-  memset(&buffer[0], '\0', length); 
-  //USBSerial.read(); 
+  char* buffer = new char[16 + 1]; // Puffer für Eingabe + 1 für '\0'
   while (USBSerial.available()) USBSerial.read();
-
   while(!USBSerial.available()) {vTaskDelay(1);} //wait for user-input
-  if (USBSerial.peek() == 'C') return true;     
+  if (USBSerial.peek() == 'C' || USBSerial.peek() == 'c' ) return true;
 
   int bytesRead = 0;
   while (USBSerial.available()) 
   {
-    bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, length - bytesRead);
+    bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, 16 - bytesRead);
     if (bytesRead > 0 || buffer[0] == '\n') break;
     vTaskDelay(1); 
   }
@@ -149,7 +147,7 @@ bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound,
   while (error != 1 || *var < lower_bound || *var > upper_bound) 
   {
     USBSerial.printf("\nIhre Eingabe: %s", buffer);
-    memset(buffer, '\0', length + 1); // Puffer leeren
+    memset(buffer, '\0', 16 + 1); // Puffer leeren
     USBSerial.printf("\n%s\n", info);
 
     while (USBSerial.available()) USBSerial.read();
@@ -162,7 +160,7 @@ bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound,
     int bytesRead = 0;
     while (USBSerial.available()) 
     {
-      bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, length - bytesRead);
+      bytesRead += USBSerial.readBytesUntil('\n', buffer + bytesRead, 16 - bytesRead);
       if (bytesRead > 0 || buffer[0] == '\n') break;
       vTaskDelay(1); 
     }
@@ -179,7 +177,6 @@ bool process_UserInput(char* buffer, uint8_t *var, int length, uint lower_bound,
 
   return false;
 }
-
 
 //======================================================================
 //optic feedback for user, to let him know, that the setup is finished 
@@ -241,12 +238,13 @@ void indicate_finished_setup()
 }
 
 
+
+
 //======================================================================
 //partition find functions
 //======================================================================
 
-
-// Get the string name of type enum values used in this example
+// Get the string name of type enum values
 static const char* get_type_str(esp_partition_type_t type)
 {
     switch(type) {
@@ -259,7 +257,7 @@ static const char* get_type_str(esp_partition_type_t type)
     }
 }
 
-// Get the string name of subtype enum values used in this example
+// Get the string name of subtype enum values
 static const char* get_subtype_str(esp_partition_subtype_t subtype)
 {
     switch(subtype) {

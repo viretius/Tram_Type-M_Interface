@@ -47,34 +47,6 @@ key report defines:
 
 #include <lokSim3D_interface/lokSim3D_interface.h>
 
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED}; 
-char host[] = "8.8.8.8";
-uint16_t port = 80;
-char server[] = "arduino.tips";
-//IPAddress ip(192, 168, 1, 177); // Adjust to your network
-//IPAddress server(8, 8, 8, 8); // Google DNS
-
-
-//================================================================================================================
-//================================================================================================================
-
-/**
-*
-*funktion like sprintf(). prints a formatted string to a queue, instead of a c-String variable
-*used for verbose and info output to USBSerial monitor 
-*/
-
-
-//========================================================================================================
-
-/*inline float int_to_volts ( uint16_t dac_value, uint8_t bits ) 
-{  
-  return (((float)dac_value / ((1 << bits) - 1)) * ADC_REFERENCE_VOLTAGE);      //dac value (uint8_t) -> cast to float and divide by 127 (8 bit resolution), multiply by referene voltage. e.g. 127/(128-1) * 5.0V = 5.0V
-};*/
-
-/*
-optic feedback for user, to let him know, that the setup is finished 
-*/
 using namespace lokSim3D_config;
 
 namespace lokSim3D_interface {
@@ -528,13 +500,36 @@ void tx_task (void * pvParameters)
 
 void config_task (void * pvParameters)
 {
+  TickType_t intervall = pdMS_TO_TICKS(1000); //needed for debug output
+  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
+
   for(;;)
   {
     vTaskDelay(5);
+
+    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) {
+      last_stackhighwatermark_print = xTaskGetTickCount();
+      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nconfig- Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
+    }
+
+    //suspend tasks to prevent data corruption
+    vTaskSuspend(Task1);      //digital input task
+    vTaskSuspend(Task2);      //analog input task
+    vTaskSuspend(Task4);      //USBSerial rx task     
+    vTaskSuspend(Task5);      //USBSerial tx task
+
     serial_config_menu();  //tasks 1,2&5 can be resumed from within this function
+
+    if (!run_config_task) 
+    {
+      vTaskResume(Task1);
+      vTaskResume(Task2);
+      vTaskResume(Task4);
+      vTaskResume(Task5);
+      vTaskSuspend(NULL);
+    }
   }
 }
-
 //================================================================================================================
 //================================================================================================================
 void init() 
@@ -584,8 +579,6 @@ void init()
     vTaskSuspend(Task3);
     vTaskSuspend(Task5);
 
-    USBSerial.print(F("\n\nVerbindung zu W5500 Ethernet Shield wird hergestellt...\n"));
-
     // To be called before ETH.begin()
     ESP32_W5500_onEvent();
    
@@ -595,16 +588,14 @@ void init()
 
     USBSerial.print(F("\nVerbindung erfolgreich hergestellt.\n"));
     USBSerial.print(F("\nVerbindung zu LOKSIM3D TCP-Server wird hergestellt...\n"));
-    
-    if (client.connect(server, port)){
-      //USBSerial.println(F("Verbindung mit LOKSIM3D TCP-Server erfolgreich hergestellt.\n"));
-      USBSerial.println("Connected to server");
 
-      client.println("GET /something HTTP/1.1");
-      client.println("Host: somehost.com");
-      client.println("Connection: close");
-      client.println();
+    while (!client.connect(host, port, 5000)) { //try to connect to LOKSIM3D server 
+      USBSerial.print(F("."));
+      vTaskDelay(2000);
     }
+    
+    USBSerial.println("Connected to server");
+    USBSerial.println("Local IP: " + ETH.localIP().toString());
 
     indicate_finished_setup();
 
