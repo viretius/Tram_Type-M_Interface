@@ -97,7 +97,7 @@ namespace simMetro_interface {
               CHECK_BIT(ab_flag, acceleration_button[1]) ||
               CHECK_BIT(ab_flag, deceleration_button[1]) 
             ) 
-          ) continue; 
+        ) continue; 
        
       
       if (!ab_flag) continue; //check if some input-pin state changed. If not, check continue and check next IC
