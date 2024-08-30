@@ -58,7 +58,7 @@ void handshake_and_request() {
   vTaskSuspend(Task1);
   vTaskSuspend(Task2);
   vTaskSuspend(Task3);
-  vTaskSuspend(Task5);
+  //vTaskSuspend(Task5);
   
 
   xQueueSend(serial_tx_verbose_queue, "\nHandshake\n   Handshake wird durchgeführt\n", pdMS_TO_TICKS(1));
@@ -103,7 +103,7 @@ void handshake_and_request() {
   vTaskResume(Task1);
   vTaskResume(Task2);
   vTaskResume(Task3);
-  vTaskResume(Task5);
+  //vTaskResume(Task5);
 }
 
 
@@ -677,7 +677,7 @@ void init()
     vTaskSuspend(Task1);
     vTaskSuspend(Task2);
     vTaskSuspend(Task3);
-    vTaskSuspend(Task5);
+    //vTaskSuspend(Task5);
     USBSerial.print(F("\nTasks erfolgreich initialisiert.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));
 
     // To be called before ETH.begin()
