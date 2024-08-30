@@ -112,7 +112,7 @@ extern USBCDC USBSerial;
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       USBSerial
 #define _ETHERNET_WEBSERVER_LOGLEVEL_       3
-//not using default SPI-pins for int and cs
+//not using default SPI-pins
 #define INT_GPIO            17 
 #define CS_GPIO             18
 #define MISO_GPIO           47
