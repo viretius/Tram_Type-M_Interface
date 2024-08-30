@@ -16,7 +16,7 @@ void init_typeM_interface() {
     //====================================================================================
 
     //load variable from NVS to determine which interface to use
-    preferences.begin("APP", false, "nvs");
+    preferences.begin("APP", true, "nvs");
     uint8_t interface_choice = preferences.getUInt("app_setting", 0);
     preferences.end();
     if(interface_choice == 2) {
