@@ -2,7 +2,7 @@
 
 ## Initial Setup using PlatformIO
 
-Follow the steps below to perform a fresh upload:
+Follow the steps below to perform a fresh upload to an ESP32S3:
 
 1. **Build and Flash Partition Binary**
 
