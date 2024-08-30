@@ -33,7 +33,7 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 
 #define ADC_STEP_THRESHOLD 5         //lower number results in higher sensitivity
 
-#define DEBOUNCE_DELAY_MS 80
+#define DEBOUNCE_DELAY_MS 80         //debounce delay for digital inputs
 
 #define CMD_BUFFER_SIZE 10          // "X"(start) "U"(D/A) "XX"(address) "XXXX"(data) "Y"(end) "\n" 
 #define INFO_BUFFER_SIZE 75         //buffer for infos about inputs, if run_config_task = true  
@@ -45,6 +45,34 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 #define PCF_I2C_END_ADDRESS (PCF_I2C_BASE_ADDRESS + MAX_IC_COUNT - 1)
 
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos))) 
+
+
+//============================================================
+//defines for request 
+//============================================================
+
+#define GESCHWINDIGKEIT 1
+#define SPANNUNG 8
+#define AFB_SOLL_GESCHWINDIGKEIT 18
+#define MG_BREMSE 41
+#define H_BREMSE 42
+#define R_BREMSE 43
+#define SCHNELLBREMSUNG 45
+#define NOTBREMSUNG 46
+#define AFB_GESCHWINDIGKEIT 55
+#define PZB_WACHSAM 58
+#define PZB_FREI 59
+#define PZB_BEFEHL 60
+#define SIFA 61
+#define HAUPTSCHALTER 62
+#define MOTOR_SCHALTER 63
+#define SCHALTER_FAHRTRICHTUNG 64
+#define PFEIFE 65
+#define SANDEN 66
+#define TUEREN 67
+
+//============================================================
+
 
 extern Preferences preferences;       //api to store data (variable representing choice of interface) in nvs
 
@@ -111,7 +139,7 @@ extern USBCDC USBSerial;
 
 #define DEBUG_ETHERNET_WEBSERVER_PORT       USBSerial
 #define _ETHERNET_WEBSERVER_LOGLEVEL_       3
-//not using default SPI-pins
+//not using default SPI-pins for int and cs
 #define INT_GPIO            17 
 #define CS_GPIO             18
 #define MISO_GPIO           47
@@ -127,5 +155,18 @@ extern IPAddress host;
 //extern IPAddress client_ip; //has to be configured to match the server's IP address (to be implemented in config_file_utils)
 extern uint16_t port;               //default ZUSI port          
 
+extern byte handshakedata[]; //data to be sent to server after connection is established
+extern size_t handshakedata_len;
+
+extern byte request[];    //data to be sent to server after handshake 
+#define REQUEST_LEN 27  //length of request array, instead of sizeof(request) because this number is part of the array itself
+
+extern byte request_end[];
+extern size_t request_end_len;
+
+typedef struct {
+  char* pld;
+  int count;
+} tcp_payload;
 
 #endif

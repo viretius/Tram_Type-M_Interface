@@ -1,15 +1,4 @@
 /*
-cvs files: 
-  
-  mcp:
-  i2c;pin;kanal;io;key;adresse;info ->key for inputs, address for outputs
-     
-  pcf: 
-  i2c;pin;key;address;info
-
-    -> address "tp" for combined throttle 
-*/
-/*
 key report defines:
 
 #define KEY_LEFT_CTRL   0x80
@@ -48,8 +37,6 @@ using namespace lokSim3D_config;
 
 namespace lokSim3D_interface {
 
-
-
 //========================================================================================================
 //pwm output for buzzer
 //========================================================================================================
@@ -58,6 +45,74 @@ void toggle_buzzer(uint8_t pin, float frequency)
 {
 
 }
+//========================================================================================================
+//
+//========================================================================================================
+void set_output() {
+
+  
+}
+
+
+//========================================================================================================
+//client handshake with loksim3d server
+//========================================================================================================
+void handshake_and_request() {
+
+  size_t len;
+  uint8_t *ack;
+
+  //suspend tasks to prevent calls to client object and sending data to queues, that cannot be processed
+  vTaskSuspend(Task1);
+  vTaskSuspend(Task2);
+  vTaskSuspend(Task3);
+  vTaskSuspend(Task5);
+
+  xQueueSend(serial_tx_verbose_queue, "\nHandshake\n   Handshake wird durchgeführt\n", pdMS_TO_TICKS(1));
+  client.write(handshakedata, handshakedata_len);
+  xQueueSend(serial_tx_verbose_queue, "\n   Warte auf ACK vom Server", pdMS_TO_TICKS(1));
+  while (!client.available()) {
+    vTaskDelay(pdMS_TO_TICKS(500));
+    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, ".");
+  }
+
+  xQueueSend(serial_tx_verbose_queue, "\n   ACK vom Server erhalten:", pdMS_TO_TICKS(1));
+  len = client.available();
+  ack = new uint8_t[len+1];
+  while (client.available()) 
+  {
+    client.read((uint8_t*)ack, len);
+    ack[len] = '\0';
+    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "%s", ack);
+  }
+  delete[] ack; //next ack might have different length -> delete and allocate new memory
+
+  xQueueSend(serial_tx_verbose_queue, "\n   Frage Daten an...", pdMS_TO_TICKS(1));
+  client.write(request, REQUEST_LEN);
+
+  xQueueSend(serial_tx_verbose_queue, "\n   Warte auf ACK vom Server", pdMS_TO_TICKS(1));
+  while (!client.available()) {
+    vTaskDelay(pdMS_TO_TICKS(500));
+    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, ".");
+  }
+
+  xQueueSend(serial_tx_verbose_queue, "\n   ACK vom Server erhalten:", pdMS_TO_TICKS(1));
+  len = client.available();
+  ack = new uint8_t[len+1];
+  while (client.available()) 
+  {
+    client.read((uint8_t*)ack, len);
+    ack[len] = '\0';
+    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "%s", ack);
+  }
+  delete[] ack;
+
+  vTaskResume(Task1);
+  vTaskResume(Task2);
+  vTaskResume(Task3);
+  vTaskResume(Task5);
+}
+
 
 //========================================================================================================
 //
@@ -325,10 +380,7 @@ set outputs according to received data over USBSerial connection
 void output_task (void * pvParameters)
 { 
   
-  char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'}; 
-  char verbose_buffer[VERBOSE_BUFFER_SIZE] = {'\0'};
-  char address[3]; //= {'\0'}; 
-  char data[5]; //= {'\0'};
+  tcp_payload payload;
   
   uint8_t t, i;                    //lokal for-loop counter
   uint8_t value; //variable to hold from char to hex converted value for an analog output
@@ -337,73 +389,48 @@ void output_task (void * pvParameters)
   {
     vTaskDelay(5);
     memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array   
-    xQueueReceive(tcp_rx_cmd_queue, &cmd_buffer, portMAX_DELAY); //block this task, if queue is empty
+    xQueueReceive(tcp_rx_cmd_queue, &payload, portMAX_DELAY); //block this task, if queue is empty
+    
+    if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  TCP Datenpaket empfangen: %s\n", payload.pld);
+    int command_index = 2;      //skip the first two bytes
+  int value_index = 3;        //skip the first two bytes
 
-    char *buffer_ptr = cmd_buffer + 2;        //store buffer in buffer_ptr, remove first two chars (indicator for cmd-start & indicator for digital/analog data)
+  for (i = 0; i < payload.count; i++) 
+  {
+    if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Befehl: %s\n  Wert: %s", payload.pld[command_index], payload.pld[value_index]);
 
-    if (cmd_buffer[1] == 'U')                   //digital output
-    {
-      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Datentelegramm empfangen: %s", cmd_buffer);
-      
-      strncpy(address, buffer_ptr, 2);   //copy first two chars to address
-      buffer_ptr += 2;                   //remove those first two chars
-      strncpy(data, buffer_ptr, 4);      //store remaining four chars in the data char-array
 
-      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Kanal: %s  Wert: %s", address, data);
-
-      for (i = 0; i < MAX_IC_COUNT; i++) 
+    float value_cast_to_float = *((float *)&payload.pld[y]); //"Single"
+    int value_cast_to_int = *((int *)&payload.pld[y]);      //"enum" or "int"
+   
+      switch (payload.pld[command_index]) 
       {
-        if(!mcp_list[i].enabled) continue;//i2c adress not in use
-        for (t = 0; t < 16; t++) 
-        {
-          if(strncmp(mcp_list[i].address[t], address, 2) != 0) continue;
-          
-          if (CHECK_BIT(mcp_list[i].portMode, t)) //pin was set as input!
-          { 
-            if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Pin %i ist als Eingang konfiguriert.\n", t);
-            goto ret; //break both for-loops;
-          }
-
-          if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(1)) == pdTRUE) 
-          { 
-            mcp_list[i].mcp.digitalWrite(t, atoi(data)); 
-            xSemaphoreGive(i2c_mutex);
-          }
-          goto ret;  //address was found, no need to look further -> break both for-loops 
-        }
-      }
-      ret: ;
-    }
-
-    else if (cmd_buffer[1] =='V')           //analog output
-    {
-      t = 4; //pcf ICs only have one output. related channel is stored at pcf_list[4]
-      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Datentelegramm empfangen: %s", cmd_buffer);
-      
-      strncpy(address, buffer_ptr, 2);   //copy first two chars to address+
-      buffer_ptr += 2;                   //remove those first two chars
-      strncpy(data, buffer_ptr, 4);      //store remaining four chars in the data char-array
-
-      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Kanal: %s  Wert: %s \n", address, data);
-
-      for (i = 0; i < MAX_IC_COUNT; i++) 
-      {
-        if(!pcf_list[i].enabled) continue;
-        if(strcmp(pcf_list[i].address[t], address) != 0) continue;
+        case GESCHWINDIGKEIT: 
+            //analog write value_cast_to_float to pin
+            //soll und ist geschwindigkeit: welcher der beiden analogen ausgänge wird verwendet?
+            //entweder fest (ist an ic mit i2c addresse 72, soll an ic mit i2c addresse 73) oder konfigurierbar? 
+            //"info" aus config file auslesen, wenn "soll" oder "ist" in "info" enthalten ist, dann entsprechenden pin verwenden oder so
+          break;
+        case SPANNUNG: 
+          break;
+        case AFB_SOLL_GESCHWINDIGKEIT: 
+          break;
+        case PZB_BEFEHL:
+          break;
+        case PZB_WACHSAM:
+          break;
+        case PZB_FREI:
+          break;
+        case SIFA:
+          break;
+        case TUEREN:
+          break;
         
-        sscanf(data, "%04x", &value); //convert hex to dec
-        
-        if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(1)) == pdTRUE) { //portMAX_DELAY!?
-          pcf_list[i].pcf.analogWrite(value);
-          xSemaphoreGive(i2c_mutex);
-        } 
-        break;    
       }
-    }  
 
-    else {
-      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Fehlerhaftes Datentelegramm empfangen: %s\n", cmd_buffer);
-    }
+       command_index += 5;
+      value_index += 5;
+
 
   } 
 }
@@ -415,10 +442,10 @@ receive data and add to according queues
 void rx_task (void * pvParameters) //also usbserial rx task for config menu
 {
   char buffer[CMD_BUFFER_SIZE];
-  char verbose_buffer[VERBOSE_BUFFER_SIZE];
   uint8_t t, i;  
+  tcp_payload payload;
 
-  TickType_t request_interval = pdMS_TO_TICKS(100); 
+  TickType_t request_interval = pdMS_TO_TICKS(80); 
   TickType_t last_request = xTaskGetTickCount();       
 
   TickType_t request_timeout = pdMS_TO_TICKS(5000); // 5 seconds timeout
@@ -431,30 +458,47 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
     if (USBSerial.available() > 0) 
     {
       USBSerial.readBytesUntil('\n', buffer, CMD_BUFFER_SIZE);                            
-      if (buffer[0] == 'M' || buffer[0] == 'm') {
-        vTaskResume(Task6);
-      }
+      if (buffer[0] == 'M' || buffer[0] == 'm')  vTaskResume(Task6);
     }
 
 
     if (client.connected() && xTaskGetTickCount() - last_request > request_interval) 
     {
       last_request = xTaskGetTickCount();
-      client.println("GET /something HTTP/1.1"); //request data
-      client.println();
 
       while (!client.available() && (xTaskGetTickCount() - request_time) < request_timeout) {
-          vTaskDelay(pdMS_TO_TICKS(10)); 
+          vTaskDelay(request_interval); 
       }
 
-      if (client.available() > 0) 
+      if (client.available()) 
       {
-          client.readBytesUntil('\n', buffer, CMD_BUFFER_SIZE); 
-          xQueueSend(tcp_rx_cmd_queue, &buffer, pdMS_TO_TICKS(1));
+          char c[4];
+          client.readBytes(c, sizeof(c));  //first 4 bytes indicates payload size
+          
+          unsigned long payload_len = *(unsigned long *)c; //reinterpret the 4 bytes as an unsigned long
+          
+          char pld[payload_len];
+          for(i = 0; i < payload_len; i ++) { pld[i] = client.read(); }
+
+          int count = (payload_len - 2) / 5; //first two bytes are headers (indicate if a value changed), 5 bytes for each command
+
+          if (count > 2) //did any of the requested values change?
+          {
+            int size = sizeof(pld); 
+
+            if (size > 3)               //????????why?????????
+            {
+              payload.pld = new char[size];
+              memcpy(payload.pld, pld, size);
+              payload.count = count;              
+              xQueueSend(tcp_rx_cmd_queue, &payload, pdMS_TO_TICKS(1));
+            }
+          }
       } 
       else 
       {
           if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[rx_task]\n  Timeout: Keine Daten vom LOKSIM3D-Server empfangen.\n");
+          handshake_and_request();
       }
     }
 
@@ -482,7 +526,7 @@ void tx_task (void * pvParameters)
 
     if (xQueueReceive(keyboard_tx_queue, &keyReport, 1) == pdTRUE)    Keyboard.sendReport(&keyReport);
      
-    if (VERBOSE && xQueueReceive(serial_tx_verbose_queue, &buffer, 1) == pdTRUE)     USBSerial.print(buffer);
+    if (xQueueReceive(serial_tx_verbose_queue, &buffer, 1) == pdTRUE)     USBSerial.print(buffer);
     
     if (eTaskGetState(Task6) == eRunning && xQueueReceive(serial_tx_info_queue, &buffer, 1) == pdTRUE)   USBSerial.print(buffer);
     
@@ -548,12 +592,26 @@ void init()
     -1 slot with size of an integer, FIFO principal, stores commands "executed" in output_task
     -only for com between tasks. only one command (of size (CMD_BUFFER_SIZE)) large, because the hardware rx buffer of the esp32 is 256 bytes large
     */
-    tcp_rx_cmd_queue = xQueueCreate(2, CMD_BUFFER_SIZE); 
+    tcp_rx_cmd_queue = xQueueCreate(2, sizeof(tcp_payload)); 
     keyboard_tx_queue = xQueueCreate(2, sizeof(KeyReport));   //stores commands, that are created in both input-tasks and then transmitted by the tx task 
     serial_tx_info_queue = xQueueCreate(3, INFO_BUFFER_SIZE); //stores i2c address and MCP Pin, if run_config_task==true  
     serial_tx_verbose_queue = xQueueCreate(5, VERBOSE_BUFFER_SIZE); //other stuff that can be helpfull for debugging
     
     i2c_mutex = xSemaphoreCreateMutex();
+
+    // To be called before ETH.begin()
+    ESP32_W5500_onEvent();
+   
+    ETH.begin( MISO_GPIO, MOSI_GPIO, SCK_GPIO, CS_GPIO, INT_GPIO, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac );
+    
+    ESP32_W5500_waitForConnect();
+
+    USBSerial.print(F("\nVerbindung zu LOKSIM3D TCP-Server wird hergestellt...\n"));
+
+    while (!client.connect(host, port, 5000)) { //try to connect to LOKSIM3D server with 5 seconds timeout
+      USBSerial.print(F("."));
+      vTaskDelay(2000);
+    }
 
     xTaskCreatePinnedToCore(
       rx_task,          /* Task function. */
@@ -569,33 +627,20 @@ void init()
     xTaskCreate(output_task, "Task3", 2000, NULL, 1, &Task3);
     xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 1, &Task5, 0);
     xTaskCreate(config_task, "Task6", 8000, NULL, 1, &Task6);
+
     
     vTaskSuspend(Task6);
-    //suspend tasks before network initialization
-    vTaskSuspend(Task1);
-    vTaskSuspend(Task2);
-    vTaskSuspend(Task3);
-    vTaskSuspend(Task5);
-
-    // To be called before ETH.begin()
-    ESP32_W5500_onEvent();
-   
-    ETH.begin( MISO_GPIO, MOSI_GPIO, SCK_GPIO, CS_GPIO, INT_GPIO, SPI_CLOCK_MHZ, ETH_SPI_HOST, mac );
+    vTaskSuspend(Task4);
     
-    ESP32_W5500_waitForConnect();
-
-    USBSerial.print(F("\nVerbindung zu LOKSIM3D TCP-Server wird hergestellt...\n"));
-
-    while (!client.connect(host, port, 5000)) { //try to connect to LOKSIM3D server with 5 seconds timeout
-      USBSerial.print(F("."));
-      vTaskDelay(2000);
-    }
+    //all other tastks are suspended in this function, so that it is possible to call it from the rx_task (task4)
+    handshake_and_request(); 
   
     indicate_finished_setup();
 
     vTaskResume(Task1);
     vTaskResume(Task2);
     vTaskResume(Task3);
+    vTaskResume(Task4); //initially suspended, but not resumed in handshake_and_request-function
     vTaskResume(Task5);
 
     USBSerial.print(F("\nTasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));

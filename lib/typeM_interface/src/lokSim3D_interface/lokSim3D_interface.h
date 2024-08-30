@@ -4,6 +4,7 @@
 //include config file utils in parent folder
 
 #include <utils.h>
+#include <config.h>
 #include <lokSim3D_interface/config_file_utils.h>
 
 
@@ -32,6 +33,7 @@ namespace lokSim3D_interface {
 
     void toggle_buzzer(uint8_t pin, float frequency);
     uint8_t calc_throttle_position(uint8_t value);
+    void handshake_and_request();
 
     //============================================================
     //rtos stuff
