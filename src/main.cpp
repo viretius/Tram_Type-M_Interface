@@ -7,6 +7,6 @@ void setup() {
 }
 
 void loop() {
-  //vTaskDelete(NULL); //dont let the rtos task-scheduler reschedule the task, that runs the loop function 
+  vTaskDelete(NULL); //dont let the rtos task-scheduler reschedule the task, that runs the loop function 
 }
 
