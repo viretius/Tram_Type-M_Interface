@@ -2,7 +2,7 @@
 cvs files: 
   
   mcp:
-  i2c;pin;kanal;io;key;adresse;info ->key not used for simMetro
+  i2c;pin;kanal;io;key;adresse;info ->key and addresse not used for simMetro
 
     -> key_on "ps" for acceleration indicator button
     -> key_off "ns" for deceleration indicator button
@@ -45,7 +45,7 @@ bool load_config()
   {
     for (t = 0; t < 16; t++) 
     {
-      mcp_list[i].address[t] = new char[3]{'\0'}; //address konsists of 2 digits and null-terminator
+      mcp_list[i].address[t] = new char[3]{'\0'}; //address consists of 2 digits and null-terminator
     }
     for (t = 0; t < 5; t++) 
     {
