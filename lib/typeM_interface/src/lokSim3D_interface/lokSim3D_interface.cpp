@@ -100,6 +100,8 @@ void handshake_and_request() {
   }
   delete[] ack;
 
+  client.write(request_end, request_end_len);
+
   vTaskResume(Task1);
   vTaskResume(Task2);
   vTaskResume(Task3);
