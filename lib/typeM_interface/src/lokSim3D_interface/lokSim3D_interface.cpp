@@ -142,42 +142,6 @@ void press_and_release_key(KeyReport *keyReport, uint8_t pin)
 }
 
 //========================================================================================================
-/*
-*helper function for analog_input_task
-*maps the value of the potentiometer (throttle, 255 - 0 - 255) in dependency of the two buttons acceleration_indicator and deceleration_indicator to 0 - 255
-*/
-//unterschiedliche oder dieselben Kanalnummern für Zug- & Bremskraft!
-
-uint8_t calc_throttle_position(uint8_t value) 
-{ 
-
-  bool acceleration_button_status = 0;
-  bool deceleration_button_status = 0;
-
-  if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(10)) == pdTRUE) 
-  { 
-    acceleration_button_status = mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(acceleration_button[1]);
-    deceleration_button_status = mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(deceleration_button[1]);
-    xSemaphoreGive(i2c_mutex);
-  }
-  else {
-    if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Queue-Timeout: Tasterstatus zur Ermittlung der Hebelposition konnte nicht erfasst werden.");
-  }
-
-  if (!acceleration_button_status && deceleration_button_status) {
-    //return deceleration value
-    if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Deceleration: %i", value);
-    return ((255 - value) / 2) - 127; 
-  }
-  else if (acceleration_button_status && !deceleration_button_status) {
-    //return acceleration value
-    if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Acceleration: %i", value);
-    return (value / 2) + 127; 
-  }
-  
-  return 127; //throttle is in 0-position
-}
-
 //========================================================================================================
 
 
