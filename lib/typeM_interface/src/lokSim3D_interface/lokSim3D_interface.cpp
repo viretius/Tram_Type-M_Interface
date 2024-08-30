@@ -102,6 +102,14 @@ void handshake_and_request() {
 
   client.write(request_end, request_end_len);
 
+  /*
+    in arduino example:
+    after client.write(request_end, request_end_len):
+    read first paket and ignore payload
+    proceed to read acutal data
+    do this every time to read new data
+  */
+
   vTaskResume(Task1);
   vTaskResume(Task2);
   vTaskResume(Task3);
