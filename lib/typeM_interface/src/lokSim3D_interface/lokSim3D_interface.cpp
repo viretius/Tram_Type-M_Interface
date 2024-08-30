@@ -401,7 +401,7 @@ void output_task(void * pvParameters)
         case GESCHWINDIGKEIT: 
             for (t = 0; t < MAX_IC_COUNT; t++)
             {
-              if (pcf_list[t].address[0] == GESCHWINDIGKEIT) //pcf ics only have 1 analog output
+              if (atoi(pcf_list[t].address[0]) == GESCHWINDIGKEIT) //pcf ics only have 1 analog output
               {
                 if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
                 {
@@ -417,7 +417,7 @@ void output_task(void * pvParameters)
             for (t = 0; t < MAX_IC_COUNT; t++)
             {
               if (pcf_list[t].enabled == false) continue;
-              if (pcf_list[t].address[0] == AFB_SOLL_GESCHWINDIGKEIT) //pcf ics only have 1 analog output
+              if (atoi(pcf_list[t].address[0]) == AFB_SOLL_GESCHWINDIGKEIT) //pcf ics only have 1 analog output
               {
                 if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
                 {
