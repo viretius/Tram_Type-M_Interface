@@ -405,15 +405,35 @@ void output_task (void * pvParameters)
    
       switch (payload.pld[command_index]) 
       {
+         
         case GESCHWINDIGKEIT: 
-            //analog write value_cast_to_float to pin
-            //soll und ist geschwindigkeit: welcher der beiden analogen ausgänge wird verwendet?
-            //entweder fest (ist an ic mit i2c addresse 72, soll an ic mit i2c addresse 73) oder konfigurierbar? 
-            //"info" aus config file auslesen, wenn "soll" oder "ist" in "info" enthalten ist, dann entsprechenden pin verwenden oder so
+          for (t = 0; t < MAX_IC_COUNT; t++)
+          {
+            if (pcf_list[t].address[0] == GESCHWINDIGKEIT) //pcf ics only have 1 analog output
+            {
+              if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+              {
+                pcf_list[t].pcf.analogWrite(value_cast_to_float);
+                xSemaphoreGive(i2c_mutex);
+              } 
+            }
+          }
           break;
         case SPANNUNG: 
           break;
         case AFB_SOLL_GESCHWINDIGKEIT: 
+          for (t = 0; t < MAX_IC_COUNT; t++)
+          {
+            if (pcf_list[t].enabled == false) continue;
+            if (pcf_list[t].address[0] == AFB_SOLL_GESCHWINDIGKEIT) //pcf ics only have 1 analog output
+            {
+              if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+              {
+                pcf_list[t].pcf.analogWrite(value_cast_to_float);
+                xSemaphoreGive(i2c_mutex);
+              } 
+            }
+          }
           break;
         case PZB_BEFEHL:
           break;
@@ -424,6 +444,23 @@ void output_task (void * pvParameters)
         case SIFA:
           break;
         case TUEREN:
+          for (t = 0; t < MAX_IC_COUNT; t++)
+          {
+            for (i = 0; i < 16; i++)  //mcp ics with 16 I/O
+            {
+              if (mcp_list[t].enabled == false) continue;
+              if (CHECK_BIT(mcp_list[t].portMode, i)) continue; //skip input pins
+
+              if (mcp_list[t].address[0] == TUEREN) //mcp ics have 8 digital outputs
+              {
+                if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+                {
+                  mcp_list[t].mcp.digitalWrite(i, value_cast_to_int);
+                  xSemaphoreGive(i2c_mutex);
+                } 
+              }
+            }
+          }
           break;
         
       }
