@@ -83,6 +83,7 @@ typedef struct {
   bool enabled = false;
   uint8_t i2c; 
   char *address[16];
+  char *info[16];
   uint16_t last_reading;
   uint16_t portMode = 0b0;
 } MCP_Struct;
@@ -92,6 +93,7 @@ typedef struct {
   bool enabled = false;
   uint8_t i2c; 
   char *address[5];
+  char *info[5];
   uint8_t last_reading[4];  //array to temporarily save analog reads of the four inputs of a pcf-Ic
 } PCF_Struct;
 

@@ -10,6 +10,7 @@
 
 
 namespace lokSim3D_interface {   
+
     static USBHIDKeyboard Keyboard;
 
     //declare the Ethernet client object
@@ -38,6 +39,7 @@ namespace lokSim3D_interface {
     void rx_task (void * pvParameters);
     void tx_task (void * pvParameters);
     void config_task (void * pvParameters);
+
 
 };
 

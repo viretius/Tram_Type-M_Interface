@@ -59,6 +59,7 @@ void handshake_and_request() {
   vTaskSuspend(Task2);
   vTaskSuspend(Task3);
   vTaskSuspend(Task5);
+  
 
   xQueueSend(serial_tx_verbose_queue, "\nHandshake\n   Handshake wird durchgeführt\n", pdMS_TO_TICKS(1));
   client.write(handshakedata, handshakedata_len);
@@ -446,7 +447,7 @@ void output_task(void * pvParameters)
                       if (mcp_list[t].enabled == false) continue;
                       if (CHECK_BIT(mcp_list[t].portMode, i)) continue; //skip input pins
 
-                      if (atoi(&mcp_list[t].address[i]) == TUEREN) //mcp ics have 8 digital outputs
+                      if (atoi(mcp_list[t].address[i]) == TUEREN) //mcp ics have 8 digital outputs
                       {
                         if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
                         {
@@ -514,7 +515,7 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
     }
 
 
-    if (client.connected() && xTaskGetTickCount() - last_request > request_interval) 
+    if (client.connected() && ESP32_W5500_eth_connected && xTaskGetTickCount() - last_request > request_interval) 
     {
       last_request = xTaskGetTickCount();
 
@@ -547,9 +548,17 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
           }
       } 
       else 
-      {
-          if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[rx_task]\n  Timeout: Keine Daten vom LOKSIM3D-Server empfangen.\n");
-          handshake_and_request();
+      {   
+          if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[rx_task]\n  Timeout: Keine Daten vom LOKSIM3D-Server empfangen.\nClient wird neu verbunden.\n");
+          if (ESP32_W5500_eth_connected) 
+          {
+            client.stop();
+            while (!client.connect(host, port, 5000)) { //try to connect to LOKSIM3D server with 5 seconds timeout
+              USBSerial.print(F("."));
+              vTaskDelay(2000);
+            }
+            handshake_and_request();
+          }
       }
     }
 
@@ -612,7 +621,7 @@ void config_task (void * pvParameters)
 
     serial_config_menu();  //tasks 1,2&5 can be resumed from within this function
 
-    if (!run_config_task) 
+    if (!run_config_task) //
     {
       vTaskResume(Task1);
       vTaskResume(Task2);
@@ -649,6 +658,27 @@ void init()
     serial_tx_verbose_queue = xQueueCreate(5, VERBOSE_BUFFER_SIZE); //other stuff that can be helpfull for debugging
     
     i2c_mutex = xSemaphoreCreateMutex();
+    xTaskCreate(digital_input_task, "Task1", 2000, NULL, 1, &Task1);
+    xTaskCreate(analog_input_task, "Task2", 2000, NULL, 1, &Task2);
+    xTaskCreate(output_task, "Task3", 2000, NULL, 1, &Task3);
+    xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 1, &Task5, 0);
+    //open config menu from within this task
+    xTaskCreatePinnedToCore(
+      rx_task,              /* Task function. */
+      "Task4",              /* name of task. */
+      2000,                 /* Stack size */
+      NULL,                 /* optional parameters*/
+      1,                    /* priority */
+      &Task4,               /* Task handle to keep track of created task */
+      0                     /*pinned to core 0*/
+    );
+    xTaskCreate(config_task, "Task6", 8000, NULL, 1, &Task6);
+    vTaskSuspend(Task6);
+    vTaskSuspend(Task1);
+    vTaskSuspend(Task2);
+    vTaskSuspend(Task3);
+    vTaskSuspend(Task5);
+    USBSerial.print(F("\nTasks erfolgreich initialisiert.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));
 
     // To be called before ETH.begin()
     ESP32_W5500_onEvent();
@@ -663,38 +693,12 @@ void init()
       USBSerial.print(F("."));
       vTaskDelay(2000);
     }
-
-    xTaskCreatePinnedToCore(
-      rx_task,          /* Task function. */
-      "Task4",              /* name of task. */
-      2000,                 /* Stack size */
-      NULL,                 /* optional parameters*/
-      1,                    /* priority */
-      &Task4,               /* Task handle to keep track of created task */
-      0                     /*pinned to core 0*/
-    );
-    xTaskCreate(digital_input_task, "Task1", 2000, NULL, 1, &Task1);
-    xTaskCreate(analog_input_task, "Task2", 2000, NULL, 1, &Task2);
-    xTaskCreate(output_task, "Task3", 2000, NULL, 1, &Task3);
-    xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 1, &Task5, 0);
-    xTaskCreate(config_task, "Task6", 8000, NULL, 1, &Task6);
-
     
-    vTaskSuspend(Task6);
-    vTaskSuspend(Task4);
-    
-    //all other tastks are suspended in this function, so that it is possible to call it from the rx_task (task4)
-    handshake_and_request(); 
-  
     indicate_finished_setup();
 
-    vTaskResume(Task1);
-    vTaskResume(Task2);
-    vTaskResume(Task3);
-    vTaskResume(Task4); //initially suspended, but not resumed in handshake_and_request-function
-    vTaskResume(Task5);
 
-    USBSerial.print(F("\nTasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));
+    handshake_and_request(); 
+
   
   }
 } //namespace lokSim3D_interface
