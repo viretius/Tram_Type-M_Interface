@@ -33,7 +33,7 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 
 #define ADC_STEP_THRESHOLD 5         //lower number results in higher sensitivity
 
-#define DEBOUNCE_DELAY_MS 50
+#define DEBOUNCE_DELAY_MS 80
 
 #define CMD_BUFFER_SIZE 10          // "X"(start) "U"(D/A) "XX"(address) "XXXX"(data) "Y"(end) "\n" 
 #define INFO_BUFFER_SIZE 75         //buffer for infos about inputs, if run_config_task = true  
