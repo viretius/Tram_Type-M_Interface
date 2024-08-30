@@ -115,6 +115,10 @@ extern USBCDC USBSerial;
 //not using default SPI-pins for int and cs
 #define INT_GPIO            17 
 #define CS_GPIO             18
+#define MISO_GPIO           47
+#define MOSI_GPIO           38
+#define SCK_GPIO            48
+
 
 //include lib after defining SPI-pins
 #include <WebServer_ESP32_SC_W5500.h>

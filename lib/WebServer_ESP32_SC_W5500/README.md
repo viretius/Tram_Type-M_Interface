@@ -1,4 +1,4 @@
-## WebServer_ESP32_SC_W5500 Library (Slightly modded)
+## WebServer_ESP32_SC_W5500 Library
 
 [![arduino-library-badge](https://www.ardu-badge.com/badge/WebServer_ESP32_SC_W5500.svg?)](https://www.ardu-badge.com/WebServer_ESP32_SC_W5500)
 [![GitHub release](https://img.shields.io/github/release/khoih-prog/WebServer_ESP32_SC_W5500.svg)](https://github.com/khoih-prog/WebServer_ESP32_SC_W5500/releases)

@@ -2,13 +2,13 @@
 cvs files: 
   
   mcp:
-  i2c;pin;key;address;info ->key not used for simMetro
+  i2c;pin;kanal;io;key;adresse;info ->key not used for simMetro
 
     -> key_on "ps" for acceleration indicator button
     -> key_off "ns" for deceleration indicator button
      
   pcf: 
-  i2c;pin;key;address;info
+  i2c;pin;key;kanal;adresse;info
 
     -> address "tp" for combined throttle 
 */
@@ -41,6 +41,18 @@ bool load_config()
     return 0;
   }
 
+  for (i = 0; i < MAX_IC_COUNT; i++) 
+  {
+    for (t = 0; t < 16; t++) 
+    {
+      mcp_list[i].address[t] = new char[3]{'\0'}; //address konsists of 2 digits and null-terminator
+    }
+    for (t = 0; t < 5; t++) 
+    {
+      pcf_list[i].address[t] = new char[3]{'\0'}; 
+    }
+  }
+
   USBSerial.printf("\nmcp_buf_size: %i\npcf_buf_size: %i\n\n", mcp_buf_size, pcf_buf_size);
 
   char *mcp_buf = new char[mcp_buf_size]; //char *mcp_buf = new char[mcp_buf_size];
@@ -53,8 +65,8 @@ bool load_config()
   //parse data for mcp ICs
   //=======================================================
 
-  //i2c;pin;kanal;io;key;info
-  CSV_Parser mcp_parse(mcp_buf, "ucucsucss" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
+  //i2c;pin;kanal;io;key;adresse;info
+  CSV_Parser mcp_parse(mcp_buf, "ucucsuc--s" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
   
   USBSerial.println();
   mcp_parse.print();
@@ -63,7 +75,6 @@ bool load_config()
   uint8_t *pin = (uint8_t*)mcp_parse["pin"];
   char **address = (char**)mcp_parse["kanal"]; //tcp: here used for outputs (leds and stuff)
   uint8_t *io = (uint8_t*)mcp_parse["io"];      //theoreticly not needed -> rows with key are inputs, rows with tcp-addresses are outputs
-  char **key = (char**)mcp_parse["key"];        //used for inputs (buttons, switches, etc.), but also saved in mcp_list[].address[]
 
   for (t = 0; t < mcp_parse.getRowsCount(); t++) 
   {
@@ -77,62 +88,35 @@ bool load_config()
       USBSerial.printf("Pin liegt nicht zwischen 0 und 15: %u\n", pin[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
     }
-    else if (strcmp(address[t], "-1") == 0) 
+    else if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
     {
       USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
     }
-    else {
-
-      //bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
-      
-      //Store the key value in mcp_list's address array 
-      if (key[t] != nullptr)
-      {
-        //pin is a input
-        bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 1); 
-
-          // Allocate memory dynamically based on the length of the key value
-        size_t keyLength = strlen(key[t]) + 1; // +1 for null-terminator
-        mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
-        memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
-
-        // Copy the key value to the dynamically allocated memory
-        strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], key[t]);
-      }
-      else 
-      {
-        //pin is a output
-        bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 0); 
-
-        mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[3]; //address konsists of 2 digits and null-terminator 
-        memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', 3); // Clear the memory
+    else 
+    {
+      bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
         
-        //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-        if (strcmp(address[t], "ac") == 0) {
-          acceleration_button[0] = i2c[t];
-          acceleration_button[1] = pin[t];
-        }
-        else if (strcmp(address[t], "dc") == 0) {
-          deceleration_button[0] = i2c[t];
-          deceleration_button[1] = pin[t];
-        }
-        else {    
-            // Copy the key value to the dynamically allocated memory
-            strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
-        }
+      //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
+      if (strcmp(address[t], "ac") == 0) {
+        acceleration_button[0] = i2c[t];
+        acceleration_button[1] = pin[t];
       }
-
+      else if (strcmp(address[t], "dc") == 0) {
+        deceleration_button[0] = i2c[t];
+        deceleration_button[1] = pin[t];
+      }
+      else {    
+          // Copy the key value to the dynamically allocated memory
+          strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
+        }
     }
 
-     if (t == mcp_parse.getRowsCount()-1) //end of file reached
-    { 
+    if ((t == mcp_parse.getRowsCount()-1) || (i2c[t] != i2c[t+1])) //end of file reached
+    {  
       mcp_count++;
       mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].enabled = true;
-      break;
-    } else if (i2c[t] != i2c[t+1])  { 
-        mcp_count++;
-        mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].enabled = true;
-      }  
+      if (t == mcp_parse.getRowsCount()-1) break;
+    }
   } 
 
   USBSerial.printf("mcp_count: %i\n", mcp_count);
@@ -143,7 +127,8 @@ bool load_config()
 
   USBSerial.print(F("\nLese Konfigurationsdatei \"pcf.txt\"...\n"));
   
-  CSV_Parser pcf_parse(pcf_buf, "ucucsss" /*uc: unsigned char, s: string*/, /*has header*/true, /*custom delimiter*/';');
+  //i2c;pin;kanal;key;adresse;info
+  CSV_Parser pcf_parse(pcf_buf, "ucucs--s" /*uc: unsigned char, s: string*/, /*has header*/true, /*custom delimiter*/';');
  
   USBSerial.println();
   pcf_parse.print();
@@ -151,7 +136,6 @@ bool load_config()
   i2c = (uint8_t*)pcf_parse["i2c"];
   pin = (uint8_t*)pcf_parse["pin"];
   address = (char**)pcf_parse["kanal"];
-  key = (char**)pcf_parse["key"];
 
   for (t = 0; t < pcf_parse.getRowsCount(); t++)
   {
@@ -165,48 +149,27 @@ bool load_config()
       USBSerial.printf("Pin liegt nicht zwischen 0 und 4: %u\n", pin[t]);
       strcpy(pcf_list[i2c[t]-PCF_I2C_BASE_ADDRESS].address[pin[t]], "-1");   
     }
-    else if (strcmp(address[t], "-1") == 0) 
+    else if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
     {
       USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in verwendung.\n", pin[t], i2c[t]);
     }
-    else {
-      //Store the key value in pcf_list's address array 
-      if (key[t] != nullptr)
-      {
-          // Allocate memory dynamically based on the length of the key value
-        size_t keyLength = strlen(key[t]) + 1; // +1 for null-terminator
-        pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
-        memset(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
-
-        // Copy the key value to the dynamically allocated memory
-        strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], key[t]);
+    else 
+    {
+      if (strcmp(address[t], "ct") == 0) {
+        combined_throttle_pin[0] = i2c[t];
+        combined_throttle_pin[1] = pin[t]; 
       }
-      else {
-        pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]] = new char[3]; //address konsists of 2 digits and null-terminator 
-        memset(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], '\0', 3); // Clear the memory
-        
-
-        if (strcmp(address[t], "ct") == 0) {
-          combined_throttle_pin[0] = i2c[t];
-          combined_throttle_pin[1] = pin[t]; 
-        }
-        else {    
-            // Copy the key value to the dynamically allocated memory
+      else {    
             strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
         }
-      } 
-    }
-
-    if (t == pcf_parse.getRowsCount() - 1)
+    } 
+    
+    if ((t == pcf_parse.getRowsCount() - 1) || (i2c[t] != i2c[t+1])) //end of file reached or next i2c address
     {
       pcf_count++;
       pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].enabled = true;
-      break;
-    } else if (i2c[t] != i2c[t+1]) 
-    {
-      pcf_count++;
-      pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].enabled = true;
-    }
+      if (t == pcf_parse.getRowsCount() - 1) break;
+    } 
   }
   
   USBSerial.printf("pcf_count: %i\n\n", pcf_count);

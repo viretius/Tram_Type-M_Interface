@@ -14,7 +14,7 @@
   #error This code is designed for (SP32_S2/3, ESP32_C3 + W5500) to run on ESP32 platform! Please check your Tools->Board setting.
 #endif
 
-#define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
+#define DEBUG_ETHERNET_WEBSERVER_PORT  Serial
 
 // Debug Level from 0 to 4
 #define _ETHERNET_WEBSERVER_LOGLEVEL_       3

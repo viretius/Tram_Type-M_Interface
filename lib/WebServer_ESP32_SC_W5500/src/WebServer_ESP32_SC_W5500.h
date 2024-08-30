@@ -24,6 +24,7 @@
 
 #ifndef WEBSERVER_ESP32_SC_W5500_H
 #define WEBSERVER_ESP32_SC_W5500_H
+#define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
 
 //////////////////////////////////////////////////////////////
 

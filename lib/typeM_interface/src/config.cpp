@@ -3,7 +3,7 @@
 byte mac[6]; 
 IPAddress host;                 
 //extern IPAddress client_ip;         
-uint16_t port;               //default ZUSI port          
+uint16_t port;                      
 
 uint8_t VERBOSE;    
 bool config_menu;

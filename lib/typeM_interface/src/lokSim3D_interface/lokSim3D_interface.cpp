@@ -2,13 +2,10 @@
 cvs files: 
   
   mcp:
-  i2c;pin;key_on;key_off;address;info ->key_on/key_off for inputs, address for outputs
-
-    -> key_on "ps" for acceleration indicator button
-    -> key_off "ns" for deceleration indicator button
+  i2c;pin;kanal;io;key;adresse;info ->key for inputs, address for outputs
      
   pcf: 
-  i2c;pin;key_on;key_off;address;info
+  i2c;pin;key;address;info
 
     -> address "tp" for combined throttle 
 */
@@ -574,6 +571,7 @@ void init()
     xTaskCreate(config_task, "Task6", 8000, NULL, 1, &Task6);
     
     vTaskSuspend(Task6);
+    //suspend tasks before network initialization
     vTaskSuspend(Task1);
     vTaskSuspend(Task2);
     vTaskSuspend(Task3);
@@ -586,19 +584,19 @@ void init()
     
     ESP32_W5500_waitForConnect();
 
-    USBSerial.print(F("\nVerbindung erfolgreich hergestellt.\n"));
     USBSerial.print(F("\nVerbindung zu LOKSIM3D TCP-Server wird hergestellt...\n"));
 
-    while (!client.connect(host, port, 5000)) { //try to connect to LOKSIM3D server 
+    while (!client.connect(host, port, 5000)) { //try to connect to LOKSIM3D server with 5 seconds timeout
       USBSerial.print(F("."));
       vTaskDelay(2000);
     }
-    
-    USBSerial.println("Connected to server");
-    USBSerial.println("Local IP: " + ETH.localIP().toString());
-
+  
     indicate_finished_setup();
 
+    vTaskResume(Task1);
+    vTaskResume(Task2);
+    vTaskResume(Task3);
+    vTaskResume(Task5);
 
     USBSerial.print(F("\nTasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben.\n"));
   
