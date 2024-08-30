@@ -12,8 +12,8 @@ Follow the steps below to perform a fresh upload:
 
 2. **Upload File System**
 
-   Upload `littlefs.bin` to address `0x10000` (SPIFFS).
+   Upload `littlefs.bin` to address `0x190000` (SPIFFS).
 
 3. **Upload Firmware**
 
-   Upload `firmware.bin` to address `0x810000` (factory).
+   Upload `firmware.bin` to address `0x10000` (factory).
