@@ -110,10 +110,10 @@ void handshake_and_request() {
 //
 //========================================================================================================
 
-void press_and_release_key(KeyReport *keyReport, uint8_t pin) 
+void press_and_release_key(KeyReport *keyReport, uint8_t ic_address, uint8_t pin) 
 {
   //in address there might be something like "ctrl+a" or "ctrl+shift+a" or "a" -> split it and send the keys in the correct order
-  char *token = strtok(mcp_list[pin].address[pin], "+");
+  char *token = strtok(mcp_list[ic_address].address[pin], "+");
   while (token != NULL) 
   {
     if (strcmp(token, "ctrl") == 0) (*keyReport).modifiers |= KEY_LEFT_CTRL; // "|=" to combine multiple modifier keys instead of overwriting
@@ -226,7 +226,7 @@ void digital_input_task (void * pvParameters)
         if (!CHECK_BIT(ab_flag, t)) continue;      //Check which specific pin changed its state
       
           memset(&keyReport, 0, sizeof(KeyReport));                                  
-          press_and_release_key(&keyReport, t); //set keyReport according to the pin that changed its state and send to queue
+          press_and_release_key(&keyReport, i, t); //set keyReport according to the pin that changed its state and send to queue
       }             
         
       if(eTaskGetState(Task6) == eRunning) //user 
