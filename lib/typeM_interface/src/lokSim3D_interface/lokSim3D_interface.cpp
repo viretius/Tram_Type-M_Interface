@@ -122,7 +122,7 @@ void handshake_and_request() {
   unsigned long payload_len = *(unsigned long *)c; //reinterpret the 4 bytes as an unsigned long
           
   char pld[payload_len];
-  for(i = 0; i < payload_len; i ++) { pld[i] = client.read(); }
+  for(int i = 0; i < payload_len; i ++) { pld[i] = client.read(); }
   
   //vTaskResume(Task5);
 }
