@@ -30,7 +30,6 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 */
 
 #define MAX_IC_COUNT 8
-#define interface_eeprom_address 0
 
 #define ADC_STEP_THRESHOLD 5         //lower number results in higher sensitivity
 
