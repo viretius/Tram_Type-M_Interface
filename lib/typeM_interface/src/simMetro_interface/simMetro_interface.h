@@ -18,8 +18,6 @@ namespace simMetro_interface {
     void init();
 
     void toggle_buzzer(uint8_t pin, float frequency);
-    uint8_t calc_throttle_position(uint8_t value);
-
     //============================================================
     //rtos stuff
     //============================================================
