@@ -446,7 +446,7 @@ void output_task(void * pvParameters)
                       if (mcp_list[t].enabled == false) continue;
                       if (CHECK_BIT(mcp_list[t].portMode, i)) continue; //skip input pins
 
-                      if (mcp_list[t].address[0] == TUEREN) //mcp ics have 8 digital outputs
+                      if (atoi(&mcp_list[t].address[i]) == TUEREN) //mcp ics have 8 digital outputs
                       {
                         if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
                         {
