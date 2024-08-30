@@ -135,7 +135,7 @@ void press_and_release_key(KeyReport *keyReport, uint8_t ic_address, uint8_t pin
   if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Keyreport: %s", (*keyReport).keys);
 
   //wait a bit before "releasing" the keys
-  vTaskDelay(pdMS_TO_TICKS(30);
+  vTaskDelay(pdMS_TO_TICKS(30));
   //clear keyreport and send to queue
   memset(keyReport, 0, sizeof(KeyReport));
   if (eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
