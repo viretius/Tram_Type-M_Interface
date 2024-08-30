@@ -45,14 +45,6 @@ void toggle_buzzer(uint8_t pin, float frequency)
 {
 
 }
-//========================================================================================================
-//
-//========================================================================================================
-void set_output() {
-
-  
-}
-
 
 //========================================================================================================
 //client handshake with loksim3d server
@@ -377,7 +369,7 @@ void analog_input_task (void * pvParameters)
 set outputs according to received data over USBSerial connection
 */
 
-void output_task (void * pvParameters)
+void output_task(void * pvParameters)
 { 
   
   tcp_payload payload;
@@ -388,52 +380,53 @@ void output_task (void * pvParameters)
   for(;;)
   {
     vTaskDelay(5);
-    memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array   
     xQueueReceive(tcp_rx_cmd_queue, &payload, portMAX_DELAY); //block this task, if queue is empty
     
     if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  TCP Datenpaket empfangen: %s\n", payload.pld);
     int command_index = 2;      //skip the first two bytes
-  int value_index = 3;        //skip the first two bytes
+    int value_index = 3;        //skip the first two bytes
 
-  for (i = 0; i < payload.count; i++) 
-  {
-    if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Befehl: %s\n  Wert: %s", payload.pld[command_index], payload.pld[value_index]);
+    for (i = 0; i < payload.count; i++) 
+    {
+      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Befehl: %s\n  Wert: %s", payload.pld[command_index], payload.pld[value_index]);
 
 
-    float value_cast_to_float = *((float *)&payload.pld[y]); //"Single"
-    int value_cast_to_int = *((int *)&payload.pld[y]);      //"enum" or "int"
-   
-      switch (payload.pld[command_index]) 
+      float value_cast_to_float = *((float *)&payload.pld[value_index]); //"Single"
+      int value_cast_to_int = *((int *)&payload.pld[value_index]);      //"enum" based on value different actions are performed
+
+      int command = atoi(payload.pld[command_index]);
+
+
+      switch (command) 
       {
-         
         case GESCHWINDIGKEIT: 
-          for (t = 0; t < MAX_IC_COUNT; t++)
-          {
-            if (pcf_list[t].address[0] == GESCHWINDIGKEIT) //pcf ics only have 1 analog output
+            for (t = 0; t < MAX_IC_COUNT; t++)
             {
-              if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+              if (pcf_list[t].address[0] == GESCHWINDIGKEIT) //pcf ics only have 1 analog output
               {
-                pcf_list[t].pcf.analogWrite(value_cast_to_float);
-                xSemaphoreGive(i2c_mutex);
-              } 
+                if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+                {
+                  pcf_list[t].pcf.analogWrite(value_cast_to_float);
+                  xSemaphoreGive(i2c_mutex);
+                } 
+              }
             }
-          }
           break;
         case SPANNUNG: 
           break;
         case AFB_SOLL_GESCHWINDIGKEIT: 
-          for (t = 0; t < MAX_IC_COUNT; t++)
-          {
-            if (pcf_list[t].enabled == false) continue;
-            if (pcf_list[t].address[0] == AFB_SOLL_GESCHWINDIGKEIT) //pcf ics only have 1 analog output
+            for (t = 0; t < MAX_IC_COUNT; t++)
             {
-              if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+              if (pcf_list[t].enabled == false) continue;
+              if (pcf_list[t].address[0] == AFB_SOLL_GESCHWINDIGKEIT) //pcf ics only have 1 analog output
               {
-                pcf_list[t].pcf.analogWrite(value_cast_to_float);
-                xSemaphoreGive(i2c_mutex);
-              } 
+                if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+                {
+                  pcf_list[t].pcf.analogWrite(value_cast_to_float);
+                  xSemaphoreGive(i2c_mutex);
+                } 
+              }
             }
-          }
           break;
         case PZB_BEFEHL:
           break;
@@ -443,31 +436,54 @@ void output_task (void * pvParameters)
           break;
         case SIFA:
           break;
-        case TUEREN:
-          for (t = 0; t < MAX_IC_COUNT; t++)
-          {
-            for (i = 0; i < 16; i++)  //mcp ics with 16 I/O
+        case TUEREN: //enum type  
+            switch(value_cast_to_int)
             {
-              if (mcp_list[t].enabled == false) continue;
-              if (CHECK_BIT(mcp_list[t].portMode, i)) continue; //skip input pins
+              case 0: //türen freigegeben
+                for (t = 0; t < MAX_IC_COUNT; t++)
+                  {
+                    for (i = 0; i < 16; i++)  //mcp ics with 16 I/O
+                    {
+                      if (mcp_list[t].enabled == false) continue;
+                      if (CHECK_BIT(mcp_list[t].portMode, i)) continue; //skip input pins
 
-              if (mcp_list[t].address[0] == TUEREN) //mcp ics have 8 digital outputs
-              {
-                if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
-                {
-                  mcp_list[t].mcp.digitalWrite(i, value_cast_to_int);
-                  xSemaphoreGive(i2c_mutex);
-                } 
-              }
+                      if (mcp_list[t].address[0] == TUEREN) //mcp ics have 8 digital outputs
+                      {
+                        if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) 
+                        {
+                          mcp_list[t].mcp.digitalWrite(i, 1); //turn on lightbulb 
+                          xSemaphoreGive(i2c_mutex);
+                        } 
+                      }
+                    }
+                  }
+                break;
+              case 1: //türen offen
+                break;
+              case 2: //Achtungspfiff oder Durchsage
+              break;
+              case 3: //Fahrgaeste i. O.)"
+                break;
+              case 4: //türen schließen
+                break;
+              case 5: //türen zu
+                break;
+              case 6: //abfahrauftrag
+                break;
+              case 7: //türen verriegelt
+                break;
+              case 8: //ak. freigabesignal
+                break;
+              default:
+                break;
             }
-          }
           break;
         
       }
 
-       command_index += 5;
+      command_index += 5;
       value_index += 5;
-
+    }
 
   } 
 }
@@ -522,10 +538,9 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
           if (count > 2) //did any of the requested values change?
           {
             int size = sizeof(pld); 
-
             if (size > 3)               //????????why?????????
             {
-              payload.pld = new char[size];
+              payload.pld[size]; //= new char[size];
               memcpy(payload.pld, pld, size);
               payload.count = count;              
               xQueueSend(tcp_rx_cmd_queue, &payload, pdMS_TO_TICKS(1));

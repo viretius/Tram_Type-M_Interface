@@ -165,7 +165,7 @@ extern byte request_end[];
 extern size_t request_end_len;
 
 typedef struct {
-  char* pld;
+  char pld[];
   int count;
 } tcp_payload;
 

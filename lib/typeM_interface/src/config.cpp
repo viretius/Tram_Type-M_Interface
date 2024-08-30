@@ -80,7 +80,7 @@ byte request[] = {
 
                     //request data
                     GESCHWINDIGKEIT,
-                    SPANNUNG;
+                    SPANNUNG,
                     AFB_SOLL_GESCHWINDIGKEIT,
                     MG_BREMSE,
                     H_BREMSE,
