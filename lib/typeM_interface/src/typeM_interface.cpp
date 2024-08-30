@@ -15,7 +15,7 @@ void init_typeM_interface() {
     //actual application initialization
     //====================================================================================
 
-    //load variable from eeprom to determine which interface to use
+    //load variable from NVS to determine which interface to use
     preferences.begin("APP", false, "nvs");
     uint8_t interface_choice = preferences.getUInt("app_setting", 0);
     preferences.end();
