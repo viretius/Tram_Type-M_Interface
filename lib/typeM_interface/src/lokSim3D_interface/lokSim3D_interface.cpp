@@ -141,7 +141,8 @@ void press_and_release_key(KeyReport *keyReport, uint8_t pin)
 
 }
 
-//========================================================================================================
+
+
 //========================================================================================================
 
 
@@ -257,19 +258,31 @@ void digital_input_task (void * pvParameters)
 similar to digital_input_task. difference is that the connected PCF ICs are responsible for AD conversion and constantly polled
 */
 
-void analog_input_task (void * pvParameters)
+void analog_input_task (void * pvParameters) //needs 
 {
   
   char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'}; 
   char info_buffer[INFO_BUFFER_SIZE] = {'\0'}; 
   char data[5];
-  uint8_t reading[4];           //every pcf-IC has 4 analog inputs
-  uint8_t t, i, j;                                                 //lokal for-loop counter
 
+  bool acceleration_button_status = 0;
+  bool deceleration_button_status = 0;
+
+  uint8_t reading[4];           //every pcf-IC has 4 analog inputs
+  uint8_t t, i, j;              //lokal for-loop counter
+
+  TickType_t intervall = pdMS_TO_TICKS(1000); //needed for debug output
+  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
 
   for(;;)
-  {   
-    vTaskDelay(5); 
+  {
+    vTaskDelay(5);
+
+    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) //every second
+    {
+      last_stackhighwatermark_print = xTaskGetTickCount();
+      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nan in - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
+    }
     
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
@@ -291,21 +304,41 @@ void analog_input_task (void * pvParameters)
 
           pcf_list[i].last_reading[t] = reading[t];
 
-          //if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_pin[0] && t == combined_throttle_pin[1])// && reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
-          { 
-            USBSerial.println(calc_throttle_position(reading[t]));
-          }
-          
           sprintf(data, "%04X", reading[t]);    
 
-          memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array
+          memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE); //clear cmd char array
+
           //create command-string
-          strcat(cmd_buffer, "XV");                          
-          strcat(cmd_buffer, pcf_list[i].address[t]);
+          strcat(cmd_buffer, "XV");
+
+          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_pin[0] && combined_throttle_pin[1] == t) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
+          { 
+            if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);
+            //get address in dependency of which of the two buttons (acceleration/deceleration) was pressed
+            if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(40)) == pdTRUE) //40ms wait before ignoring/dropping data
+            { 
+              acceleration_button_status = mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(acceleration_button[1]);
+              deceleration_button_status = mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(deceleration_button[1]);
+              xSemaphoreGive(i2c_mutex);
+            } else {
+              if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Fehler beim Lesen der Buttons.\n");
+              continue;
+            }
+
+            if (acceleration_button_status) strcat(cmd_buffer, String(acceleration_button[0]).c_str());
+            else if (deceleration_button_status) strcat(cmd_buffer, String(deceleration_button[0]).c_str());
+            else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
+            else continue;
+
+            strcat(cmd_buffer, pcf_list[i].address[t]);
+          }
+          else strcat(cmd_buffer, pcf_list[i].address[t]); //just any other analog input
+                             
           strcat(cmd_buffer, data);
           strcat(cmd_buffer, "Y");
-                
-          if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
+
+               
+          //if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
 
           if(eTaskGetState(Task6) == eRunning) //user 
           {
@@ -358,8 +391,8 @@ void output_task(void * pvParameters)
       float value_cast_to_float = *((float *)&payload.pld[value_index]); //"Single"
       int value_cast_to_int = *((int *)&payload.pld[value_index]);      //"enum" based on value different actions are performed
 
-      int command = atoi(payload.pld[command_index]);
-
+      int command = atoi(&payload.pld[command_index]);
+      
 
       switch (command) 
       {
