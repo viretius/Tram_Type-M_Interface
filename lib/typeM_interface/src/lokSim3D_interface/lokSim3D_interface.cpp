@@ -55,9 +55,7 @@ void handshake_and_request() {
   uint8_t *ack;
 
   //suspend tasks to prevent calls to client object and sending data to queues, that cannot be processed
-  vTaskSuspend(Task1);
-  vTaskSuspend(Task2);
-  vTaskSuspend(Task3);
+  
   //vTaskSuspend(Task5);
   
 
@@ -102,17 +100,30 @@ void handshake_and_request() {
 
   client.write(request_end, request_end_len);
 
+  len = client.available();
+  ack = new uint8_t[len+1];
+  while (client.available()) 
+  {
+    client.read((uint8_t*)ack, len);
+    ack[len] = '\0';
+    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "%s", ack);
+  }
+  delete[] ack;
   /*
     in arduino example:
     after client.write(request_end, request_end_len):
     read first paket and ignore payload
     proceed to read acutal data
-    do this every time to read new data
+    do this every time to read new data 
   */
-
-  vTaskResume(Task1);
-  vTaskResume(Task2);
-  vTaskResume(Task3);
+  char c[4];
+  client.readBytes(c, sizeof(c));                 //first 4 bytes indicates payload size
+          
+  unsigned long payload_len = *(unsigned long *)c; //reinterpret the 4 bytes as an unsigned long
+          
+  char pld[payload_len];
+  for(i = 0; i < payload_len; i ++) { pld[i] = client.read(); }
+  
   //vTaskResume(Task5);
 }
 
@@ -535,6 +546,7 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
 
       if (client.available()) 
       {
+          handshake_and_request();  //send request to server
           char c[4];
           client.readBytes(c, sizeof(c));  //first 4 bytes indicates payload size
           
@@ -706,9 +718,5 @@ void init()
     
     indicate_finished_setup();
 
-
-    handshake_and_request(); 
-
-  
   }
 } //namespace lokSim3D_interface
