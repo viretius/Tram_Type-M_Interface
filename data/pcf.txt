@@ -1,11 +1,11 @@
-i2c;pin;kanal;key;info
-72;0;65;;test
-72;1;66;;test
-72;2;67;;test
-72;3;68;;test
-72;4;69;;test
-73;0;ct;;test
-73;1;71;;test
-73;2;72;;test
-73;3;73;;test
-73;4;74;;test
+i2c;pin;kanal;key;adresse;info
+72;0;65;;;test
+72;1;66;;;test
+72;2;67;;;test
+72;3;68;;;test
+72;4;69;;;test
+73;0;ct;;ct;Kombi Fahr-und Bremshebel
+73;1;71;;;test
+73;2;72;;;test
+73;3;73;;;test
+73;4;74;;;test
