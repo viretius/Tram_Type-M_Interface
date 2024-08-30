@@ -113,7 +113,7 @@ void handshake_and_request() {
     in arduino example:
     after client.write(request_end, request_end_len):
     read first paket and ignore payload
-    proceed to read acutal data
+    proceed to read actual data
     do this every time to read new data 
   */
   char c[4];
