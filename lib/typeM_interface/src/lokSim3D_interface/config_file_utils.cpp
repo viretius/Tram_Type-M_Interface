@@ -7,7 +7,7 @@ cvs files:
   pcf: 
   i2c;pin;key;kanal;adresse;info
 
-    -> address "tp" for combined throttle 
+    -> address "ct" for combined throttle 
 */
 
 #include "lokSim3D_interface/config_file_utils.h"
