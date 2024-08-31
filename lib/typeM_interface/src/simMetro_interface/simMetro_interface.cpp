@@ -235,8 +235,8 @@ namespace simMetro_interface {
               continue;
             }
 
-            if (acceleration_button_status) strcat(cmd_buffer, String(acceleration_button[0]).c_str());
-            else if (deceleration_button_status) strcat(cmd_buffer, String(deceleration_button[0]).c_str());
+            if (acceleration_button_status) strcat(cmd_buffer, String(acceleration_button[3]).c_str());
+            else if (deceleration_button_status) strcat(cmd_buffer, String(deceleration_button[3]).c_str());
             else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
             else continue;
 
