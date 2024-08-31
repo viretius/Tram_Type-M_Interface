@@ -110,7 +110,7 @@ extern bool run_config_task;      //if config task is running and user picked op
 */
 extern uint8_t acceleration_button[2]; 
 extern uint8_t deceleration_button[2];
-extern uint8_t combined_throttle_pin[2];
+extern uint8_t combined_throttle_ic;
 
 extern TaskHandle_t Task1;   
 extern TaskHandle_t Task2;

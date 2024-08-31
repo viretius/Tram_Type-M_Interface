@@ -221,7 +221,7 @@ namespace simMetro_interface {
           //create command-string
           strcat(cmd_buffer, "XV");
 
-          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_pin[0] && combined_throttle_pin[1] == t) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
+          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic && t == 0) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
           { 
             if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);
             //get address in dependency of which of the two buttons (acceleration/deceleration) was pressed
@@ -235,11 +235,10 @@ namespace simMetro_interface {
               continue;
             }
 
-            if (acceleration_button_status) strcat(cmd_buffer, String(acceleration_button[3]).c_str());
-            else if (deceleration_button_status) strcat(cmd_buffer, String(deceleration_button[3]).c_str());
+            if (acceleration_button_status) strcat( cmd_buffer, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
+            else if (deceleration_button_status) strcat( cmd_buffer, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
             else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
             else continue;
-
           }
           else strcat(cmd_buffer, pcf_list[i].address[t]); //just any other analog input
                              

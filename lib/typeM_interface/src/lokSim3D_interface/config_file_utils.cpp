@@ -57,15 +57,15 @@ bool load_config()
   //=======================================================
 
   //i2c;pin;kanal;io;key;adresse;info
-  CSV_Parser mcp_parse(mcp_buf, "ucuc-ucsss" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
+  CSV_Parser mcp_parse(mcp_buf, "ucuc--sss" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
   
   USBSerial.println();
   mcp_parse.print();
   
   uint8_t *i2c = (uint8_t*)mcp_parse["i2c"];
   uint8_t *pin = (uint8_t*)mcp_parse["pin"];
-  char **address = (char**)mcp_parse["addresse"]; //tcp: here used for outputs (leds and stuff)
-  uint8_t *io = (uint8_t*)mcp_parse["io"];      //theoreticly not needed -> rows with key are inputs, rows with tcp-addresses are outputs
+  char **address = (char**)mcp_parse["adresse"]; //tcp: here used for outputs (leds and stuff)
+  //uint8_t *io = (uint8_t*)mcp_parse["io"];      //theoreticly not needed -> rows with key are inputs, rows with tcp-addresses are outputs
   char **key = (char**)mcp_parse["key"];        //used for inputs (buttons, switches, etc.), but also saved in mcp_list[].address[]
   char **info = (char**)mcp_parse["info"];      
 
@@ -81,80 +81,70 @@ bool load_config()
       USBSerial.printf("I2C-Adresse liegt nicht zwischen %i und %i: %u\n", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, i2c[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
     }
-    else if (pin[t] < 0 || pin[t] > 15) //
+    if (pin[t] < 0 || pin[t] > 15) //
     {
       USBSerial.printf("Pin liegt nicht zwischen 0 und 15: %u\n", pin[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
     }
-    else if (strcmp(address[t], "-1") == 0 || address[t] == nullptr) 
-    {
-      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
-    }
     else {      
       //evalute if pin is input or output by checking if key is set or not instead of checking io
       //Store the key value in mcp_list's address array 
-      if (key[t] != nullptr)
+      if (sizeof(key[t]) < 1) //no key value -> output
       {
         //pin is a input
         bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 1); 
 
-        // Allocate memory dynamically based on the length of the key value
-        size_t keyLength = strlen(key[t]) + 1; // +1 for null-terminator
-        mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
-        memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
+        //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
+        if ((strncmp(key[t], "ac(", 3) == 0) || (strncmp(key[t], "dc(", 3) == 0) ) //accereleration detection
+        {
+          
+          acceleration_button[0] = i2c[t];
+          acceleration_button[1] = pin[t];
+    
+          // extract values inside of the brackets
+          char* start = strchr(key[t], '(');
+          char* end = strchr(key[t], ')');
+            
+          if (start != nullptr && end != nullptr && start < end) 
+          {
+            *end = '\0'; //replace end bracket with null-terminator
+            char* _key = start + 1; //start with the character after the opening bracket
+            size_t keyLength = strlen(_key) + 1;
 
-        // Copy the key value to the dynamically allocated memory
-        strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], key[t]);
+            mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
+            memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
+            strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], _key);
+            
+            USBSerial.printf("found special intput. key: %s\n", _key);
+          } else {
+                USBSerial.println("Fehler: Ungültiges Format für ac-Kanalnummer.");
+          }
+        } 
+        else {   //"normal" input
+            // Copy the key value to the dynamically allocated memory
+            // Allocate memory dynamically based on the length of the key value
+            size_t keyLength = strlen(key[t]) + 1; // +1 for null-terminator
+            mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
+            memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
+            strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], key[t]);
+          }
       }
-      //output - save address value in mcp_list's address array
-      else {
+      //output
+      else 
+      {
         //pin is a output
         bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 0); 
 
         mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[3]; //address konsists of 2 digits and null-terminator 
         memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', 3); // Clear the memory
+   
+        // Copy the key value to the dynamically allocated memory
+        strncpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t], 3);  
         
-        //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-        //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-       if (strncmp(address[t], "ac(", 3) == 0) //accereleration detection
-       {
-        acceleration_button[0] = i2c[t];
-        acceleration_button[1] = pin[t];
-    
-        // extract values inside of the brackets
-        char* start = strchr(address[t], '(');
-        char* end = strchr(address[t], ')');
-          
-        if (start != nullptr && end != nullptr && start < end) 
-        {
-          *end = '\0'; //replace end bracket with null-terminator
-          char* adr = start + 1; 
-          acceleration_button[3] = static_cast<uint8_t>(atoi(adr)); //convert to int with atoi and cast to uint8_t
-        } else {
-              USBSerial.println("Fehler: Ungültiges Format für ac-Kanalnummer.");
-            }
-      } 
-      else if (strncmp(address[t], "dc(", 3) == 0)
-      {
-        deceleration_button[0] = i2c[t];
-        deceleration_button[1] = pin[t];
-          
-        char* start = strchr(address[t], '(');
-        char* end = strchr(address[t], ')');
-          
-        if (start != nullptr && end != nullptr && start < end) 
-        {
-          *end = '\0'; // Ende der Zeichenkette nach der Zahl
-          char* adr = start + 1; // Zeiger auf die Zahl nach '('
-          deceleration_button[3] = static_cast<uint8_t>(atoi(adr));
-        } else {
-            USBSerial.println("Fehler: Ungültiges Format für dc-Kanalnummer.");
-            }
       }
-        else {    
-            // Copy the key value to the dynamically allocated memory
-            strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
-        }
+      if (strcmp(address[t], "-1") == 0 || sizeof(address[t]) < 1) 
+      {
+        USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
       }
 
     }
@@ -183,7 +173,7 @@ bool load_config()
 
   i2c = (uint8_t*)pcf_parse["i2c"];
   pin = (uint8_t*)pcf_parse["pin"];
-  address = (char**)pcf_parse["addresse"];
+  address = (char**)pcf_parse["adresse"];
   key = (char**)pcf_parse["key"];
   info = (char**)pcf_parse["info"];
 

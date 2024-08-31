@@ -103,8 +103,9 @@ bool load_config()
       bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
         
       //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-      else if (strncmp(address[t], "ac(", 3) == 0) //accereleration detection
+      if ((strncmp(address[t], "ac(", 3) == 0) || (strncmp(address[t], "dc(", 3) == 0) ) //accereleration detection
       {
+    
         acceleration_button[0] = i2c[t];
         acceleration_button[1] = pin[t];
     
@@ -114,30 +115,15 @@ bool load_config()
           
         if (start != nullptr && end != nullptr && start < end) 
         {
-          *end = '\0'; //replace end bracket with null-terminator
+          *end = '\0';        //replace end bracket with null-terminator
           char* adr = start + 1; 
-          acceleration_button[3] = static_cast<uint8_t>(atoi(adr)); //convert to int with atoi and cast to uint8_t
+          strcpy( mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], adr ); //copy extracted address to mcp_list
+                  USBSerial.printf("found special intput. address: %s\n", adr);
+
         } else {
-              USBSerial.println("Fehler: Ungültiges Format für ac-Kanalnummer.");
-            }
+              USBSerial.println("Fehler: Ungültiges Format für ac / dc Kanalnummer.");
+        }
       } 
-      else if (strncmp(address[t], "dc(", 3) == 0)
-      {
-        deceleration_button[0] = i2c[t];
-        deceleration_button[1] = pin[t];
-          
-        char* start = strchr(address[t], '(');
-        char* end = strchr(address[t], ')');
-          
-        if (start != nullptr && end != nullptr && start < end) 
-        {
-          *end = '\0'; // Ende der Zeichenkette nach der Zahl
-          char* adr = start + 1; // Zeiger auf die Zahl nach '('
-          deceleration_button[3] = static_cast<uint8_t>(atoi(adr));
-        } else {
-            USBSerial.println("Fehler: Ungültiges Format für dc-Kanalnummer.");
-            }
-      }
       else {   //"normal" output/input 
           // just Copy the address
           strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
@@ -188,7 +174,7 @@ bool load_config()
       USBSerial.printf("Pin liegt nicht zwischen 0 und 4: %u\n", pin[t]);
       strcpy(pcf_list[i2c[t]-PCF_I2C_BASE_ADDRESS].address[pin[t]], "-1");   
     }
-    else if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
+    if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
     {
       USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in verwendung.\n", pin[t], i2c[t]);
     }
@@ -200,6 +186,7 @@ bool load_config()
           strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
         }
     } 
+     
     
     if ((t == pcf_parse.getRowsCount() - 1) || (i2c[t] != i2c[t+1])) //end of file reached or next i2c address
     {
