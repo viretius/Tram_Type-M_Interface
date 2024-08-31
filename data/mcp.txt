@@ -1,4 +1,4 @@
-i2c;pin;kanal;io;key;adresse;info
+i2c;pin;kanal;io;key;addresse;info
 32;0;1;0;shift+a;13;Motor-Hauptschalter
 32;1;2;1;strg+a;;
 32;2;3;1;a;;
