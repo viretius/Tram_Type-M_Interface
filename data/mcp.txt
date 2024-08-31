@@ -22,8 +22,8 @@ i2c;pin;kanal;io;key;adresse;info
 33;4;21;0;;;
 33;5;22;0;;;
 33;6;23;1;;;
-33;7;24;1;;;
-33;8;dc;1;;dc;Bremstaster am Hebel
+33;7;-1;1;;;
+33;8;dc(24);1;;dc;Bremstaster am Hebel
 33;9;26;0;;;
 33;10;27;0;;;
 33;11;28;0;;;
@@ -32,8 +32,8 @@ i2c;pin;kanal;io;key;adresse;info
 33;14;31;1;;;
 33;15;32;1;;;
 34;0;33;0;;;
-34;1;34;0;;;
-34;2;ac;0;;ac;Beschleunigungstaster am Hebel
+34;1;-1;0;;;
+34;2;ac(34);0;;ac;Beschleunigungstaster am Hebel
 34;3;36;0;;;
 34;4;37;1;;;
 34;5;38;1;;;
