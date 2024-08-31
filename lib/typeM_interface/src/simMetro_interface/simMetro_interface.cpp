@@ -240,7 +240,6 @@ namespace simMetro_interface {
             else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
             else continue;
 
-            strcat(cmd_buffer, pcf_list[i].address[t]);
           }
           else strcat(cmd_buffer, pcf_list[i].address[t]); //just any other analog input
                              
