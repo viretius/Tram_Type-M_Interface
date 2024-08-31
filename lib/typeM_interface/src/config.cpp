@@ -4,9 +4,9 @@ uint8_t VERBOSE;
 bool config_menu;
 bool run_config_task;
 
-uint8_t acceleration_button[2];
-uint8_t deceleration_button[2];
-uint8_t combined_throttle_pin[2];
+uint8_t acceleration_button[2]; //i2c_adr, pin, adr
+uint8_t deceleration_button[2]; //i2c_adr, pin, adr
+uint8_t combined_throttle_ic; //i2c-adr (pcf ics have only one output)
 
 
 Preferences preferences;
