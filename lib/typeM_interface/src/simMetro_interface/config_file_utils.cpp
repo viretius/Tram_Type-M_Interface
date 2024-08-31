@@ -194,35 +194,10 @@ bool load_config()
     }
     else 
     {
-      else if (strncmp(address[t], "ct(", 3) == 0) {
-    combined_throttle_pin[0] = i2c[t];
-    combined_throttle_pin[1] = pin[t];
-
-    // Suchen der öffnenden und schließenden Klammer
-    char* start = strchr(address[t], '(');
-    char* end = strchr(address[t], ')');
-
-    if (start != nullptr && end != nullptr && start < end) {
-        *end = '\0'; // Zeichenkette an der schließenden Klammer beenden
-        char* numbers = start + 1; // Zeiger auf die Zahlen nach '('
-
-        // Trennen der Zahlen mit strtok
-        char* first_number = strtok(numbers, ",");
-        char* second_number = strtok(nullptr, ",");
-
-        if (first_number != nullptr && second_number != nullptr) {
-            combined_throttle_pin[3] = static_cast<uint8_t>(atoi(first_number));
-            combined_throttle_pin[4] = static_cast<uint8_t>(atoi(second_number));
-        } else {
-            USBSerial.println("Fehler: Ungültiges Format für ct-Kanalnummern.");
-        }
-    } else {
-        USBSerial.println("Fehler: Klammern fehlen oder sind falsch platziert.");
-    }
-}
+      if (strncmp(address[t], "ct(", 3) == 0) combined_throttle_ic = i2c[t]; //address for accel / decel is stored in acceleration- / deceleration_button
 
       else {    
-            strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
+          strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
         }
     } 
     
