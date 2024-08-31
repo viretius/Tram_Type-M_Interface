@@ -103,16 +103,43 @@ bool load_config()
       bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
         
       //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-      if (strcmp(address[t], "ac") == 0) {
+      else if (strncmp(address[t], "ac(", 3) == 0) //accereleration detection
+      {
         acceleration_button[0] = i2c[t];
         acceleration_button[1] = pin[t];
-      }
-      else if (strcmp(address[t], "dc") == 0) {
+    
+        // extract values inside of the brackets
+        char* start = strchr(address[t], '(');
+        char* end = strchr(address[t], ')');
+          
+        if (start != nullptr && end != nullptr && start < end) 
+        {
+          *end = '\0'; //replace end bracket with null-terminator
+          char* adr = start + 1; 
+          acceleration_button[3] = static_cast<uint8_t>(atoi(adr)); //convert to int with atoi and cast to uint8_t
+        } else {
+              USBSerial.println("Fehler: Ungültiges Format für ac-Kanalnummer.");
+            }
+      } 
+      else if (strncmp(address[t], "dc(", 3) == 0)
+      {
         deceleration_button[0] = i2c[t];
         deceleration_button[1] = pin[t];
+          
+        char* start = strchr(address[t], '(');
+        char* end = strchr(address[t], ')');
+          
+        if (start != nullptr && end != nullptr && start < end) 
+        {
+          *end = '\0'; // Ende der Zeichenkette nach der Zahl
+          char* adr = start + 1; // Zeiger auf die Zahl nach '('
+          deceleration_button[3] = static_cast<uint8_t>(atoi(adr));
+        } else {
+            USBSerial.println("Fehler: Ungültiges Format für dc-Kanalnummer.");
+            }
       }
-      else {    
-          // Copy the key value to the dynamically allocated memory
+      else {   //"normal" output/input 
+          // just Copy the address
           strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
         }
     }
