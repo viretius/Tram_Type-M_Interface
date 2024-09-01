@@ -89,7 +89,7 @@ bool load_config()
     else {      
       //evalute if pin is input or output by checking if key is set or not instead of checking io
       //Store the key value in mcp_list's address array 
-      if (sizeof(key[t]) < 1) //no key value -> output
+      if (sizeof(key[t]) >= 1) //no key value -> output
       {
         //pin is a input
         bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 1); 
@@ -97,7 +97,6 @@ bool load_config()
         //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
         if ((strncmp(key[t], "ac(", 3) == 0) || (strncmp(key[t], "dc(", 3) == 0) ) //accereleration detection
         {
-          
           acceleration_button[0] = i2c[t];
           acceleration_button[1] = pin[t];
     
@@ -110,12 +109,14 @@ bool load_config()
             *end = '\0'; //replace end bracket with null-terminator
             char* _key = start + 1; //start with the character after the opening bracket
             size_t keyLength = strlen(_key) + 1;
+            //USBSerial.printf("found special intput. key: %s\n", _key); //debug
+
 
             mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
             memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
             strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], _key);
             
-            USBSerial.printf("found special intput. key: %s\n", _key);
+            
           } else {
                 USBSerial.println("Fehler: Ungültiges Format für ac-Kanalnummer.");
           }
@@ -142,12 +143,13 @@ bool load_config()
         strncpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t], 3);  
         
       }
-      if (strcmp(address[t], "-1") == 0 || sizeof(address[t]) < 1) 
-      {
-        USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
-      }
-
     }
+    if (strcmp(address[t], "-1") == 0 || sizeof(address[t]) < 1) 
+    {
+      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
+    }
+
+    
 
     if ((t == mcp_parse.getRowsCount()-1) || (i2c[t] != i2c[t+1])) //end of file reached
     {  

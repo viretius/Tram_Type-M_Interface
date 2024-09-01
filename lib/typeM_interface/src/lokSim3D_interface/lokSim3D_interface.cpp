@@ -54,7 +54,6 @@ void handshake_and_request() {
   size_t len;
   uint8_t *ack;
 
-  //suspend tasks to prevent calls to client object and sending data to queues, that cannot be processed
   
   //vTaskSuspend(Task5);
   
@@ -715,6 +714,10 @@ void init()
     }
     
     indicate_finished_setup();
+
+    vTaskResume(Task1);
+    vTaskResume(Task2);
+    vTaskResume(Task3);
 
   }
 } //namespace lokSim3D_interface

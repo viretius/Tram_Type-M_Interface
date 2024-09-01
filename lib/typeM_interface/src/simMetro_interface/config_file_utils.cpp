@@ -89,14 +89,10 @@ bool load_config()
       USBSerial.printf("I2C-Adresse liegt nicht zwischen %i und %i: %u\n", MCP_I2C_BASE_ADDRESS, MCP_I2C_END_ADDRESS, i2c[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
     }
-    else if (pin[t] < 0 || pin[t] > 15) //
+    if (pin[t] < 0 || pin[t] > 15) //
     {
       USBSerial.printf("Pin liegt nicht zwischen 0 und 15: %u\n", pin[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
-    }
-    else if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
-    {
-      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
     }
     else 
     {
@@ -118,7 +114,7 @@ bool load_config()
           *end = '\0';        //replace end bracket with null-terminator
           char* adr = start + 1; 
           strcpy( mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], adr ); //copy extracted address to mcp_list
-                  USBSerial.printf("found special intput. address: %s\n", adr);
+          //USBSerial.printf("found special intput. address: %s\n", adr); //debug
 
         } else {
               USBSerial.println("Fehler: Ungültiges Format für ac / dc Kanalnummer.");
@@ -127,7 +123,12 @@ bool load_config()
       else {   //"normal" output/input 
           // just Copy the address
           strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
-        }
+      }
+    }
+
+    if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
+    {
+      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
     }
 
     if ((t == mcp_parse.getRowsCount()-1) || (i2c[t] != i2c[t+1])) //end of file reached
