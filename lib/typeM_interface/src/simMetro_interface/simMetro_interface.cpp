@@ -69,14 +69,6 @@ static bool deceleration_button_status = false;
       }
       
       ab_flag = (readingAB ^ mcp_list[i].last_reading) & mcp_list[i].portMode; 
-             
-       /*
-       * these pins are used in analog_input_task, to indicate direction of the throttle / potentiometer
-       * -> not relevant for this task
-       *
-       * first check if current i2c address matches to configured one
-       * then check, if ab_flag has a set-bit at the index of one of the configured buttons
-       */
  
       if (!ab_flag) continue; //check if some input-pin state changed. If not, check continue and check next IC
          
