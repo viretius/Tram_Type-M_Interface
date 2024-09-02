@@ -130,7 +130,7 @@ void printBinary(uint16_t value)
 
 void opt_1() 
 {
-    run_config_task = 1;  //set flag to return to menu after this function
+    run_config_task = 1;  //set flag to return to menu after this function returns
     USBSerial.print(F("trainsim config"));
     USBSerial.print(F("Sie können jetzt einen beliebigen Taster/Schalter/Hebel betätigen."));
     USBSerial.print(F("\nUm wieder zurück zum Menü zu gelangen, geben Sie ein \"C\" ein.\n"));    
@@ -154,10 +154,10 @@ void opt_2()
 {
     int i, t;
     run_config_task = 1;
-
+  
     USBSerial.print(F("Die Ausgabe erfolgt sortiert nach der I2C-Adresse (DEC nicht HEX!).\nEs werden erst alle MCP-konfigurationen gelistet gefolgt von denen der PCF-ICs.\n"));
 
-    USBSerial.print(F("\nmcp-Konfiguration:\n\ni2c;pin;kanalnummer;io"));
+    USBSerial.print(F("\nmcp-Konfiguration:\n\ni2c;pin;kanal/adresse/tastenkombination;io;info"));
     
      for (i = 0; i < MAX_IC_COUNT; i++) 
      {
@@ -168,11 +168,12 @@ void opt_2()
         USBSerial.printf("%i;", t);
         USBSerial.printf("%s;", mcp_list[i].address[t]);
         USBSerial.printf("%i", (mcp_list[i].portMode & (1 << (t)))? 1:0); //check if bit is set a position t
+        USBSerial.printf("%s", mcp_list[i].info[t]);
             
       }
     }
 
-    USBSerial.print(F("\n\npcf-Konfiguration:\n\ni2c;pin;kanalnummer"));
+    USBSerial.print(F("\n\npcf-Konfiguration:\n\ni2c;pin;kanal/adresse/tastenkombination;info"));
 
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
@@ -182,6 +183,7 @@ void opt_2()
         USBSerial.printf("\n%i;", pcf_list[i].i2c);
         USBSerial.printf("%i;", t);
         USBSerial.printf("%s;", pcf_list[i].address[t]);
+        USBSerial.printf("%s", pcf_list[i].info[t]);
       }
     }
     USBSerial.print(F("\n\nMenü wird erneut aufgerufen..."));
