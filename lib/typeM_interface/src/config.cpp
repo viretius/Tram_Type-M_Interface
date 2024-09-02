@@ -4,16 +4,14 @@ uint8_t VERBOSE;
 bool config_menu;
 bool run_config_task;
 
-uint8_t acceleration_button[]; //i2c_adr, pin
-uint8_t deceleration_button[]; //i2c_adr, pin
-uint8_t combined_throttle_ic; //i2c-adr (pcf ics have only one output)
-
-
 Preferences preferences;
 
 MCP_Struct mcp_list[MAX_IC_COUNT]; 
 PCF_Struct pcf_list[MAX_IC_COUNT];
 
+uint8_t acceleration_button[2]; 
+uint8_t deceleration_button[2];
+uint8_t combined_throttle_ic[2];
 
 TaskHandle_t Task1;   //digital input
 TaskHandle_t Task2;   //analog input

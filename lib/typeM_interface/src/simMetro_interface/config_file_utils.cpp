@@ -18,7 +18,7 @@ cvs files:
 using namespace simMetro_interface;
   
 namespace simMetro_config{
-  
+
 
 bool load_config()
 {
@@ -98,13 +98,19 @@ bool load_config()
     {
       bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], io[t]);
         
+      bool is_ac = strncmp(address[t], "ac(", 3) == 0;
+      bool is_dc = strncmp(address[t], "dc(", 3) == 0;
       //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-      if ((strncmp(address[t], "ac(", 3) == 0) || (strncmp(address[t], "dc(", 3) == 0) ) //accereleration detection
+      if (is_ac || is_dc ) //accereleration detection
       {
-    
-        acceleration_button[0] = i2c[t];
-        acceleration_button[1] = pin[t];
-    
+        if (is_ac) {       
+          acceleration_button[0] = i2c[t];
+          acceleration_button[1] = pin[t];
+        }
+        if (is_dc) {
+          deceleration_button[0] = i2c[t];
+          deceleration_button[1] = pin[t];
+        }
         // extract values inside of the brackets
         char* start = strchr(address[t], '(');
         char* end = strchr(address[t], ')');
@@ -114,7 +120,7 @@ bool load_config()
           *end = '\0';        //replace end bracket with null-terminator
           char* adr = start + 1; 
           strcpy( mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], adr ); //copy extracted address to mcp_list
-          //USBSerial.printf("found special intput. address: %s\n", adr); //debug
+          USBSerial.printf("found special input. address: %s\n", mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]]); //debug
 
         } else {
               USBSerial.println("Fehler: Ungültiges Format für ac / dc Kanalnummer.");
@@ -126,10 +132,10 @@ bool load_config()
       }
     }
 
-    if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
+    /*if (strcmp(address[t], "-1" ) == 0 || address[t] == nullptr) 
     {
       USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
-    }
+    }*/
 
     if ((t == mcp_parse.getRowsCount()-1) || (i2c[t] != i2c[t+1])) //end of file reached
     {  
@@ -181,8 +187,13 @@ bool load_config()
     }
     else 
     {
-      if (strncmp(address[t], "ct(", 3) == 0) combined_throttle_ic = i2c[t]; //address for accel / decel is stored in acceleration- / deceleration_button
+      if (strncmp(address[t], "ct", 3) == 0)
+      {
+        combined_throttle_ic[0] = i2c[t]; //address for accel / decel is stored in acceleration- / deceleration_button
+        combined_throttle_ic[1] = pin[t];
+        USBSerial.printf("toller kombihebel gefunden: %i, %i", combined_throttle_ic[0], combined_throttle_ic[1]);
 
+      } 
       else {    
           strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
         }

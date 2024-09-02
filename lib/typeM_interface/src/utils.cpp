@@ -39,17 +39,19 @@ void USB_Event_Callback(void *arg, esp_event_base_t event_base, int32_t event_id
   }
 }
 
-void queue_printf(QueueHandle_t queue, const int size, const char *format, ...) {
+void queue_printf(QueueHandle_t queue, int size, const char *format, ...) {
     
-    char buffer[size];
+    char *buffer = new char[size];
     va_list args;
     va_start(args, format); //format -> last argument before arg-list
     vsnprintf(buffer, size, format, args);
     va_end(args);
     
-    if (xQueueSend(queue, &buffer, pdMS_TO_TICKS(100)) != pdTRUE) {
-      if (VERBOSE) USBSerial.print("Queue is full. Message dropped.");
+    if (xQueueSend(queue, &buffer, pdMS_TO_TICKS(100)) == pdFALSE) {
+      USBSerial.print(buffer);
+      //if (VERBOSE) USBSerial.print("Queue is full. Message dropped.");
     }
+    delete buffer;
 }
 
 size_t getFilesize(fs::FS &fs, const char* path) 

@@ -10,8 +10,10 @@ using namespace simMetro_config;
 
 namespace simMetro_interface {
 
-    
- 
+//SemaphoreHandle_t i2c_mutex;   
+
+static bool acceleration_button_status = false;
+static bool deceleration_button_status = false;
 //================================================================================================================
 
 //========================================================================================================
@@ -49,26 +51,15 @@ namespace simMetro_interface {
   uint16_t ab_flag = 0b0;     //set bit indicates, which pin of a port changed 
   
   char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'};              //stores resulting command depending on input that gets queued and later transmitted   
-  char info_buffer[INFO_BUFFER_SIZE] = {'\0'};
+  char info_buffer[INFO_BUFFER_SIZE+CMD_BUFFER_SIZE] = {'\0'};
   char data[5];                         //4 chars + nullterminator
   uint8_t t, i, j;                      //lokal for-loop counter
 
- 
-  const TickType_t intervall = pdMS_TO_TICKS(400); //needed for debug output
-  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
-  
   TickType_t xLastWakeTime = xTaskGetTickCount(); //used for debounce delay
-
 
   for(;;)
   {
     vTaskDelay(5);
-
-    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) 
-    {
-      last_stackhighwatermark_print = xTaskGetTickCount();
-      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\n\ndi in - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
-    }
       
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
@@ -80,7 +71,7 @@ namespace simMetro_interface {
       }
       
       ab_flag = (readingAB ^ mcp_list[i].last_reading) & mcp_list[i].portMode; 
-       
+             
        /*
        * these pins are used in analog_input_task, to indicate direction of the throttle / potentiometer
        * -> not relevant for this task
@@ -88,18 +79,7 @@ namespace simMetro_interface {
        * first check if current i2c address matches to configured one
        * then check, if ab_flag has a set-bit at the index of one of the configured buttons
        */
-      if (  
-            ( 
-              i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS || 
-              i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS 
-            ) &&
-            ( 
-              CHECK_BIT(ab_flag, acceleration_button[1]) ||
-              CHECK_BIT(ab_flag, deceleration_button[1]) 
-            ) 
-          ) continue; 
-       
-      
+ 
       if (!ab_flag) continue; //check if some input-pin state changed. If not, check continue and check next IC
          
       xTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS(DEBOUNCE_DELAY_MS) );  //suspend this task and free cpu resources for the specific debounce delay
@@ -122,11 +102,26 @@ namespace simMetro_interface {
         for (int j = 0; j < 16; j++) { strcat(port, (CHECK_BIT(readingAB, j) ? "1" : "0")); }
         queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[digital_input_task]\n  GPIO Register: %s\n", port);
       }
-          
+
+      if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS) 
+      {
+        acceleration_button_status = CHECK_BIT(readingAB, acceleration_button[1]) == 0;
+        if (acceleration_button_status) continue;
+      }
+      if (i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS) 
+      {
+        deceleration_button_status = CHECK_BIT(readingAB, deceleration_button[1]) == 0;
+        if (deceleration_button_status) continue;
+      }
+
       for (t = 0; t < 16; t++)            //loop through every bit of ab_flag (every pin of every connected IC)
       {                                         
         if (!CHECK_BIT(ab_flag, t)) continue;      //Check which specific pin changed its state
-      
+        if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == acceleration_button[1]) continue; 
+        if(i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == deceleration_button[1]) continue; 
+        
+
+
         memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array                       
               
         (ab_flag & readingAB) ? strcpy(data, "0000") : strcpy(data, "0001") ;   //check wether the pin changed from 0 to 1 or 1 to 0 and store according char to "data" variable, inverted because of the implementation in the simulation programm
@@ -136,11 +131,11 @@ namespace simMetro_interface {
         strcat(cmd_buffer, data);
         strcat(cmd_buffer, "Y");
                           
-        if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
+        if ((!VERBOSE) && (eTaskGetState(Task6) != eRunning)) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
 
         if(eTaskGetState(Task6) == eRunning) //user 
         {
-          memset(&info_buffer[0], '\0', INFO_BUFFER_SIZE);              //clear cmd char array
+          memset(&info_buffer[0], '\0', INFO_BUFFER_SIZE+CMD_BUFFER_SIZE);              //clear cmd char array
           strcpy(info_buffer, "\n[digital_input_task]\n  Pin: ");
           
           if (t>7) {
@@ -172,27 +167,17 @@ namespace simMetro_interface {
 {
   
   char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'}; 
-  char info_buffer[INFO_BUFFER_SIZE] = {'\0'}; 
+  char info_buffer[INFO_BUFFER_SIZE+CMD_BUFFER_SIZE] = {'\0'}; 
   char data[5];
-
-  bool acceleration_button_status = 0;
-  bool deceleration_button_status = 0;
 
   uint8_t reading[4];           //every pcf-IC has 4 analog inputs
   uint8_t t, i, j;              //lokal for-loop counter
 
   TickType_t intervall = pdMS_TO_TICKS(1000); //needed for debug output
-  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
 
   for(;;)
   {
     vTaskDelay(5);
-
-    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) //every second
-    {
-      last_stackhighwatermark_print = xTaskGetTickCount();
-      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nan in - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
-    }
     
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
@@ -218,38 +203,39 @@ namespace simMetro_interface {
 
           memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE); //clear cmd char array
 
-          //create command-string
-          strcat(cmd_buffer, "XV");
+          char kanal[3] = {0,0, 0};
+          memset(&kanal[0], '\0', 3); //clear cmd char array
 
-          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic && t == 0) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
+          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1]) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
           { 
-            if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);
-            //get address in dependency of which of the two buttons (acceleration/deceleration) was pressed
-            if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(40)) == pdTRUE) //40ms wait before ignoring/dropping data
-            { 
-              acceleration_button_status = mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(acceleration_button[1]);
-              deceleration_button_status = mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(deceleration_button[1]);
-              xSemaphoreGive(i2c_mutex);
-            } else {
-              if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Fehler beim Lesen der Buttons.\n");
-              continue;
-            }
+            if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);            
 
-            if (acceleration_button_status) strcat( cmd_buffer, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
-            else if (deceleration_button_status) strcat( cmd_buffer, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+            if (acceleration_button_status) 
+            {
+              USBSerial.println("beschleunigen");
+              strcat( kanal, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
+            }
+            else if (deceleration_button_status) 
+            {
+              USBSerial.println("bremsen");
+              strcat( kanal, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+            }
             else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
             else continue;
           }
-          else strcat(cmd_buffer, pcf_list[i].address[t]); //just any other analog input
-                             
+          else strcat(kanal, pcf_list[i].address[t]); //just any other analog input
+          
+          //create command-string
+          strcat(cmd_buffer, "XV");
+          strcat(cmd_buffer, kanal);   
           strcat(cmd_buffer, data);
           strcat(cmd_buffer, "Y");
                 
-          if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
+          if ((!VERBOSE) && (eTaskGetState(Task6) != eRunning)) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
 
           if(eTaskGetState(Task6) == eRunning) //user 
           {
-            memset(&info_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array
+            memset(&info_buffer[0], '\0', INFO_BUFFER_SIZE+CMD_BUFFER_SIZE);              //clear cmd char array
 
             //create string "Pin: XXX\nI2C-Adresse: 0xXX"
             strcpy(info_buffer, "Pin: ");
@@ -387,7 +373,7 @@ void rx_task (void * pvParameters)
     if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) //every second
     {
       last_stackhighwatermark_print = xTaskGetTickCount();
-      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nserial rx - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
+      //queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nserial rx - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
     }
 
     if (USBSerial.available() > 0) //hw rx buffer holds at least one char
@@ -414,18 +400,9 @@ void rx_task (void * pvParameters)
 { 
   char buffer[INFO_BUFFER_SIZE]; 
 
-  TickType_t intervall = pdMS_TO_TICKS(1000); //
-  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
-
   for(;;)
   {
-    vTaskDelay(5);
-
-    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) //every second
-    {
-      last_stackhighwatermark_print = xTaskGetTickCount();
-      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nSerial tx - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
-    }
+    vTaskDelay(2);
 
     if (xQueueReceive(serial_tx_cmd_queue, &buffer, 1) == pdTRUE)     USBSerial.print(buffer); 
     
@@ -499,9 +476,11 @@ void init()
     i2c_mutex = xSemaphoreCreateMutex();
 
     xTaskCreate(digital_input_task, "Task1", 2000, NULL, 2, &Task1);
+    USBSerial.println("Digital Input tast gestartet");
     xTaskCreate(analog_input_task, "Task2", 2000, NULL, 2, &Task2);
+    USBSerial.println("Analog Input tast gestartet");
     xTaskCreate(output_task, "Task3", 2000, NULL, 2, &Task3);
-
+    USBSerial.println("Output tast gestartet");
     xTaskCreatePinnedToCore(
       rx_task,       /* Task function. */
       "Task4",              /* name of task. */
@@ -511,14 +490,14 @@ void init()
       &Task4,               /* Task handle to keep track of created task */
       0                     /*pinned to core 0, code runs by default on core 1*/
     );
-
+    USBSerial.println("Serial RX Task gestartet");
     xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 2, &Task5, 0);
-
+    USBSerial.println("Serial TX Task gestartet");
     xTaskCreate(config_task, "Task6", 8000, NULL, 2, &Task6);
     vTaskSuspend(Task6);
 
     //vTaskSuspendAll(); //suspends not only tasks but also the scheduler itself -> 
-    indicate_finished_setup();
+    //indicate_finished_setup();
     //xTaskResumeAll();
     
     USBSerial.printf(("Tasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben."));

@@ -98,8 +98,8 @@ typedef struct {
 } PCF_Struct;
 
 
-extern MCP_Struct mcp_list[MAX_IC_COUNT]; 
-extern PCF_Struct pcf_list[MAX_IC_COUNT];
+extern MCP_Struct mcp_list[]; 
+extern PCF_Struct pcf_list[];
 
 extern uint8_t VERBOSE;           //0: no output, 1: infos, 
 extern bool run_config_task;      //if config task is running and user picked option 1, this variable is set to true and some infos are printed to serial monitor
@@ -108,9 +108,9 @@ extern bool run_config_task;      //if config task is running and user picked op
 * storing i2c address[0] and pin number[1]  
 * used to detect, which direction the throttle is beeing moved to
 */
-extern uint8_t acceleration_button[2]; 
-extern uint8_t deceleration_button[2];
-extern uint8_t combined_throttle_ic;
+extern uint8_t acceleration_button[]; 
+extern uint8_t deceleration_button[];
+extern uint8_t combined_throttle_ic[];
 
 extern TaskHandle_t Task1;   
 extern TaskHandle_t Task2;
@@ -167,7 +167,7 @@ extern byte request_end[];
 extern size_t request_end_len;
 
 typedef struct {
-  char pld[];
+  char *pld;
   int count;
 } tcp_payload;
 

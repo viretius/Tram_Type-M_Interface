@@ -37,6 +37,9 @@ using namespace lokSim3D_config;
 
 namespace lokSim3D_interface {
 
+static bool acceleration_button_status = false;
+static bool deceleration_button_status = false;
+
 //========================================================================================================
 //pwm output for buzzer
 //========================================================================================================
@@ -188,9 +191,8 @@ void digital_input_task (void * pvParameters)
 
   for(;;)
   {
-   vTaskDelay(5); //run this task only every 10ms pr so 
-   //eTaskGetState(Task6) = eTaskGetState(Task6);
-
+    vTaskDelay(5);
+      
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
       if(!mcp_list[i].enabled) continue; //IC with this i2c address is "deactivated"
@@ -201,7 +203,7 @@ void digital_input_task (void * pvParameters)
       }
       
       ab_flag = (readingAB ^ mcp_list[i].last_reading) & mcp_list[i].portMode; 
-       
+             
        /*
        * these pins are used in analog_input_task, to indicate direction of the throttle / potentiometer
        * -> not relevant for this task
@@ -209,18 +211,7 @@ void digital_input_task (void * pvParameters)
        * first check if current i2c address matches to configured one
        * then check, if ab_flag has a set-bit at the index of one of the configured buttons
        */
-      if (  
-            ( 
-              i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS || 
-              i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS 
-            ) &&
-            ( 
-              CHECK_BIT(ab_flag, acceleration_button[1]) ||
-              CHECK_BIT(ab_flag, deceleration_button[1]) 
-            ) 
-          ) continue; 
-       
-      
+ 
       if (!ab_flag) continue; //check if some input-pin state changed. If not, check continue and check next IC
          
       xTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS(DEBOUNCE_DELAY_MS) );  //suspend this task and free cpu resources for the specific debounce delay
@@ -243,13 +234,26 @@ void digital_input_task (void * pvParameters)
         for (int j = 0; j < 16; j++) { strcat(port, (CHECK_BIT(readingAB, j) ? "1" : "0")); }
         queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[digital_input_task]\n  GPIO Register: %s\n", port);
       }
-          
+
+      if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS) 
+      {
+        acceleration_button_status = CHECK_BIT(readingAB, acceleration_button[1]) == 0;
+        if (acceleration_button_status) continue;
+      }
+      if (i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS) 
+      {
+        deceleration_button_status = CHECK_BIT(readingAB, deceleration_button[1]) == 0;
+        if (deceleration_button_status) continue;
+      }
+
       for (t = 0; t < 16; t++)            //loop through every bit of ab_flag (every pin of every connected IC)
       {                                         
         if (!CHECK_BIT(ab_flag, t)) continue;      //Check which specific pin changed its state
+        if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == acceleration_button[1]) continue; 
+        if(i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == deceleration_button[1]) continue; 
       
-          memset(&keyReport, 0, sizeof(KeyReport));                                  
-          press_and_release_key(&keyReport, i, t); //set keyReport according to the pin that changed its state and send to queue
+        memset(&keyReport, 0, sizeof(KeyReport));                                  
+        press_and_release_key(&keyReport, i, t); //set keyReport according to the pin that changed its state and send to queue
       }             
         
       if(eTaskGetState(Task6) == eRunning) //user 
@@ -300,12 +304,6 @@ void analog_input_task (void * pvParameters) //needs
   for(;;)
   {
     vTaskDelay(5);
-
-    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) //every second
-    {
-      last_stackhighwatermark_print = xTaskGetTickCount();
-      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nan in - Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
-    }
     
     for (i = 0; i < MAX_IC_COUNT; i++) 
     {
@@ -331,36 +329,36 @@ void analog_input_task (void * pvParameters) //needs
 
           memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE); //clear cmd char array
 
-          //create command-string
-          strcat(cmd_buffer, "XV");
+          char kanal[3] = {0,0, 0};
+          memset(&kanal[0], '\0', 3); //clear cmd char array
 
-          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic && t == 0) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
+          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1]) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
           { 
-            if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);
-            //get address in dependency of which of the two buttons (acceleration/deceleration) was pressed
-            if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(40)) == pdTRUE) //40ms wait before ignoring/dropping data
-            { 
-              acceleration_button_status = mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(acceleration_button[1]);
-              deceleration_button_status = mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].mcp.digitalRead(deceleration_button[1]);
-              xSemaphoreGive(i2c_mutex);
-            } else {
-              if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Fehler beim Lesen der Buttons.\n");
-              continue;
-            }
+            if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);            
 
-            if (acceleration_button_status) strcat( cmd_buffer, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
-            else if (deceleration_button_status) strcat( cmd_buffer, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+            if (acceleration_button_status) 
+            {
+              USBSerial.println("beschleunigen");
+              strcat( kanal, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
+            }
+            else if (deceleration_button_status) 
+            {
+              USBSerial.println("bremsen");
+              strcat( kanal, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+            }
             else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
             else continue;
           }
-          else strcat(cmd_buffer, pcf_list[i].address[t]); //just any other analog input
-                             
+          else strcat(kanal, pcf_list[i].address[t]); //just any other analog input
+          
+          /*create command-string
+          strcat(cmd_buffer, "XV");
+          strcat(cmd_buffer, kanal);   
           strcat(cmd_buffer, data);
           strcat(cmd_buffer, "Y");
-
                
           //if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
-
+          */
           if(eTaskGetState(Task6) == eRunning) //user 
           {
             memset(&info_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array
@@ -544,10 +542,14 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
       if (client.available()) 
       {
           handshake_and_request();  //send request to server
-          char c[4];
+          uint8_t c[4];
           client.readBytes(c, sizeof(c));  //first 4 bytes indicates payload size
           
-          unsigned long payload_len = *(unsigned long *)c; //reinterpret the 4 bytes as an unsigned long
+          size_t payload_len = 0x0;
+          payload_len |= c[0];
+          payload_len |= c[1] << 8; 
+          payload_len |= c[2] << 16; 
+          payload_len |= c[3] << 24;
           
           char pld[payload_len];
           for(i = 0; i < payload_len; i ++) { pld[i] = client.read(); }
@@ -556,11 +558,10 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
 
           if (count > 2) //did any of the requested values change?
           {
-            int size = sizeof(pld); 
-            if (size > 3)               //????????why?????????
+            if (payload_len > 3)               //????????why?????????
             {
-              payload.pld[size]; //= new char[size];
-              memcpy(payload.pld, pld, size);
+              payload.pld = new char[payload_len];
+              memcpy(payload.pld, pld, payload_len);
               payload.count = count;              
               xQueueSend(tcp_rx_cmd_queue, &payload, pdMS_TO_TICKS(1));
             }
