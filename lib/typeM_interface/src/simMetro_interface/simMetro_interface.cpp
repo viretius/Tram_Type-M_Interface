@@ -10,8 +10,6 @@ using namespace simMetro_config;
 
 namespace simMetro_interface {
 
-//SemaphoreHandle_t i2c_mutex;   
-
 static bool acceleration_button_status = false;
 static bool deceleration_button_status = false;
 //================================================================================================================
