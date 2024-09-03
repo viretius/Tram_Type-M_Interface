@@ -396,19 +396,19 @@ void serial_config_menu()
     switch (option)
     {
         case 1:
-            opt_1();
+            opt_1(); //unnötig -> in 6 integrieren
             break;
         case 2:
-            opt_2();
+            opt_2(); //unnötig
             break;
         case 3:
-            opt_3();
+            opt_3(); //unnötig
             break;
         case 4:
-            opt_4();
+            opt_4(); 
             break;
         case 5:
-            opt_5();
+            opt_5();//unnötig
             break;
         case 6: 
             toggle_verbose();
