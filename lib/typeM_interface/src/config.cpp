@@ -42,7 +42,7 @@ byte handshakedata[] = {
 
                         0x02,   // CLIENT_TYPE (1 byte) = Fahrpult
                         0x12,   //ident length
-                                        //"Fahrpult (ESP32S3"
+                                        //"Fahrpult (ESP32S3)"
                         0x46,
                         0x61,
                         0x68,
