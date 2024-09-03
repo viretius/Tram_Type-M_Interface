@@ -402,7 +402,7 @@ void serial_config_menu()
             opt_2(); //unnötig
             break;
         case 3:
-            opt_3(); //unnötig
+            opt_3(); //unnötig -> ändern von ct, ac und dc pins
             break;
         case 4:
             opt_4(); 
