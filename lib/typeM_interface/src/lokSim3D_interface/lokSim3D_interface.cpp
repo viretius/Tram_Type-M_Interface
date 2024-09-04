@@ -517,8 +517,6 @@ receive data and add to according queues
 
 void rx_task (void * pvParameters) //also usbserial rx task for config menu
 {
-  char buffer[2]; //receive a single char with serial monitor if available. 
-
   uint8_t t, i;  
   tcp_payload payload;
 
@@ -533,9 +531,8 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
     vTaskDelay(5);
 
     if (USBSerial.available() > 0) 
-    {
-      USBSerial.readBytesUntil('\n', buffer, 2);                            
-      if (buffer[0] == 'M' || buffer[0] == 'm')  vTaskResume(Task6);
+    {                       
+      if (USBSerial.peek() ==  'M' || USBSerial.peek() == 'm')  vTaskResume(Task6);
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 
