@@ -133,8 +133,11 @@ void handshake_and_request() {
 //
 //========================================================================================================
 
-void press_and_release_key(KeyReport *keyReport, uint8_t ic_address, uint8_t pin) 
+void press_and_release_key(uint8_t ic_address, uint8_t pin) 
 {
+  KeyReport *keyReport;
+  memset(&keyReport, 0, sizeof(KeyReport));  
+  
   //in address there might be something like "ctrl+a" or "ctrl+shift+a" or "a" -> split it and send the keys in the correct order
   char *token = strtok(mcp_list[ic_address].address[pin], "+");
   uint8_t key_count = 6; //max 6 simultenous keys / report 
@@ -188,7 +191,6 @@ void digital_input_task (void * pvParameters)
   uint16_t readingAB = 0b0;
   uint16_t ab_flag = 0b0;     //set bit indicates, which pin of a port changed 
   
-  KeyReport keyReport;  
   char verbose_buffer[VERBOSE_BUFFER_SIZE] = {'\0'};
   char data[5];                         //4 chars + nullterminator
   uint8_t t, i, j;                      //lokal for-loop counter
@@ -269,8 +271,9 @@ void digital_input_task (void * pvParameters)
           xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(1));
         }
 
-        memset(&keyReport, 0, sizeof(KeyReport));                                  
-        press_and_release_key(&keyReport, i, t); //set keyReport according to the pin that changed its state and send to queue
+        //how to differentiate between button / switch ?? another entry in config file??? >:(
+        //e.g. button for horn and switch for light
+        press_and_release_key(i, t); //send keyReport according to the pin that changed its state and send to queue
                  
       }   
     }
