@@ -86,7 +86,8 @@ bool load_config()
       USBSerial.printf("Pin liegt nicht zwischen 0 und 15: %u\n", pin[t]);
       strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], "-1");      
     }
-    else {      
+    else 
+    {      
       //evalute if pin is input or output by checking if key is set or not instead of checking io
       //Store the key value in mcp_list's address array 
       if (sizeof(key[t]) >= 1) //no key value -> output
@@ -95,33 +96,34 @@ bool load_config()
         bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 1); 
         
         bool is_ac = strncmp(address[t], "ac(", 3) == 0;
-      bool is_dc = strncmp(address[t], "dc(", 3) == 0;
-      //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
-      if (is_ac || is_dc ) //accereleration detection
-      {
-        if (is_ac) {       
-          acceleration_button[0] = i2c[t];
-          acceleration_button[1] = pin[t];
-        }
-        if (is_dc) {
-          deceleration_button[0] = i2c[t];
-          deceleration_button[1] = pin[t];
-        }
-        // extract values inside of the brackets
-        char* start = strchr(address[t], '(');
-        char* end = strchr(address[t], ')');
-          
-        if (start != nullptr && end != nullptr && start < end) 
-        {   
-          *end = '\0'; //replace end bracket with null-terminator
-          char* _key = start + 1; //start with the character after the opening bracket
-          size_t keyLength = strlen(_key) + 1;
-          //USBSerial.printf("found special intput. key: %s\n", _key); //debug
+        bool is_dc = strncmp(address[t], "dc(", 3) == 0;
+        //custom buttons, status affects the data, that will be transmitted after change of the combined throttle
+        if (is_ac || is_dc ) //accereleration detection
+        {
+          if (is_ac) {       
+            acceleration_button[0] = i2c[t];
+            acceleration_button[1] = pin[t];
+          }
+          if (is_dc) {
+            deceleration_button[0] = i2c[t];
+            deceleration_button[1] = pin[t];
+          }
 
-          mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
-          memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
-          strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], _key);  
-        } else {
+          // extract values inside of the brackets
+          char* start = strchr(address[t], '(');
+          char* end = strchr(address[t], ')');
+          
+          if (start != nullptr && end != nullptr && start < end) 
+          {   
+            *end = '\0'; //replace end bracket with null-terminator
+            char* _key = start + 1; //start with the character after the opening bracket
+            size_t keyLength = strlen(_key) + 1;
+            //USBSerial.printf("found special intput. key: %s\n", _key); //debug
+
+            mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]] = new char[keyLength];
+            memset(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], '\0', keyLength); // Clear the memory
+            strcpy(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].address[pin[t]], _key);  
+          } else {
               USBSerial.println("Fehler: Ungültiges Format für ac-Kanalnummer.");
           }
         } 
@@ -148,12 +150,6 @@ bool load_config()
         
       }
     }
-    if (strcmp(address[t], "-1") == 0 || sizeof(address[t]) < 1) 
-    {
-      USBSerial.printf("Pin %u an IC mit Adresse %i (DEC) nicht in Verwendung.\n", pin[t], i2c[t]);
-    }
-
-    
 
     if ((t == mcp_parse.getRowsCount()-1) || (i2c[t] != i2c[t+1])) //end of file reached
     {  
@@ -484,7 +480,7 @@ static void process_MACInput()
 //let user change keyboard shortcut / tcp address of an input / output
 //adjustments to be made for loksim3d ( )
 //==========================================================================================================================
-static void opt_4() {
+static void opt_1() {
                   
   uint8_t i, t;
   int i2c_adr;
@@ -562,7 +558,7 @@ static void opt_4() {
 //Network settings
 //==========================================================================================================================
 
-static void opt_11() 
+static void network_settings() 
 {
   int option = 0;
   char info[145];
@@ -625,24 +621,21 @@ void serial_config_menu()
     USBSerial.print(F("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"));
     USBSerial.print(F("\nUm Änderungen dauerhaft im Flash-Speicher zu sichern, muss das Konfigurationsmenü über die Option 7 beendet werden. Bei einem Neustart werden ungesicherte Änderungen verworfen.\n"));
     USBSerial.print(F("Auswahlmöglichkeiten zur Fehlersuche und Konfiguration des Fahrpults: \n\n"));  
-    USBSerial.print(F("1 -> Wenn ein Taster/Schalter oder ein analoger Eingang betätigt wird, wird zusätzlich zu dem Datentelegramm der Pin und die I2C Adresse ausgegeben.\n"));
-    USBSerial.print(F("2 -> Ausgabe der aktuellen Konfiguration im CSV style.\n"));
-    USBSerial.print(F("3 -> Ändern der Port-Konfiguration oder der Konfiguration eines einzelnen Pins eines MCP-ICs. Es muss die I2C Addresse bekannt sein.\n"));
-    USBSerial.print(F("4 -> Tastenkombination / TCP-Adresse eines Ein-/ Ausgangs ändern. Es muss die I2C Addresse des dazugehörigen ICs und die Pin-Nummer bekannt sein.\n"));
-    USBSerial.print(F("5 -> Anzahl der MCP oder PCF ICs ändern bzw. I2C Adressen (de-)aktivieren.\n"));
+     USBSerial.print(F("1 -> Kanalnummer eines Ein-/ Ausgangs ändern. Es muss die I2C Addresse des dazugehörigen ICs und die Pin-Nummer bekannt sein.\n"));
     if(VERBOSE){
-        USBSerial.print(F("6 -> Debugging Ausgabe Ausschalten.\n"));
+        USBSerial.print(F("2 -> Debugging Ausgabe Ausschalten.\n"));
     }else{ 
-        USBSerial.print(F("6 -> Debugging Ausgabe Einschalten.\n"));
+        USBSerial.print(F("2 -> Debugging Ausgabe Einschalten.\n"));
     }
-    USBSerial.print(F("7 -> Änderungen Speichern und Konfigurationsmenü beenden.\n"));
-    USBSerial.print(F("8 -> Konfigurationsmenü beenden.\n"));
-    USBSerial.print(F("9 -> Neustart. Nicht gesicherte Änderungen (Ausgenommen Netzwerkkonfiguration) gehen verloren!\n"));
-    USBSerial.print(F("10 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n"));
-    USBSerial.print(F("11 -> Netzwerkeinstellungen ändern\n"));
+    USBSerial.print(F("3 -> Änderungen Speichern und Konfigurationsmenü beenden.\n"));
+    USBSerial.print(F("4 -> Konfigurationsmenü beenden.\n"));
+    USBSerial.print(F("5 -> Neustart. Nicht gesicherte Änderungen gehen verloren!\n"));
+    USBSerial.print(F("6 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n\n"));
+
+    USBSerial.print(F("7 -> Netzwerkeinstellungen ändern\n"));
 
     strcpy(info, "Diese Option steht nicht zur verfügung.\nGeben Sie eine der Verfügbaren Optionen ein, oder beenden Sie mit \"C\" das Konfigurationsmenü.\n");
-    if (get_integer_with_range_check(&option, 1, 11, info)) option = 8;   //exit menu, if user entered "C"
+    if (get_integer_with_range_check(&option, 1, 7, info)) option = 4;   //exit menu, if user entered "C"
     
     delete[] buffer;    //dead variable, not used 
     
@@ -656,33 +649,22 @@ void serial_config_menu()
             opt_1();
             break;
         case 2:
-            opt_2();
-            break;
-        case 3:
-            opt_3();
-            break;
-        case 4:
-            opt_4();
-            break;
-        case 5:
-            opt_5();
-            break;
-        case 6: 
             toggle_verbose();
             break;
-        case 7:
-            commit_config_to_fs();
+        case 3:
+            USBSerial.println("Diese Funktion wurde noch nicht implementiert.");
+            //commit_config_to_fs(2); //2: loksim3D
             break;
-        case 8: 
+        case 4:
             break;
-        case 9: 
+        case 5:
             ESP.restart();
             break;
-        case 10: 
-            opt_10();
+        case 6: 
+            choose_sim();
             break;
-        case 11:
-            opt_11();
+        case 7:
+            network_settings();
             break;
         default:
             USBSerial.read();

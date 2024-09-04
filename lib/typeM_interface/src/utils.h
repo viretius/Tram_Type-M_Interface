@@ -7,16 +7,27 @@
 #include <USB.h>
 #include <USBHIDKeyboard.h>
 
-
-void USB_Event_Callback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data); //debugging
-
 //==============================================================================================
 //funktion like sprintf(). prints a formatted string to a queue, instead of a c-String variable
 //used for verbose output and 
 //==============================================================================================
 
-void queue_printf(QueueHandle_t queue, const int size, const char *format, ...);
+template <size_t count>
+void queue_printf(QueueHandle_t queue, const char *format, ...) {
+    
+    static char buffer[count] = {'\0'}; 
 
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, count, format, args);
+    va_end(args);
+    
+    // Send buffer contents to the queue
+    if (xQueueSend(queue, &buffer, pdMS_TO_TICKS(10)) != pdTRUE) {
+        USBSerial.println("Queue full\n");
+        USBSerial.print(buffer);
+    }
+}
 //==============================================================================================
 //helperfunctions for config_file_utils
 //==============================================================================================
@@ -36,23 +47,17 @@ bool get_integer_with_range_check(int *var, uint lower_bound, uint upper_bound, 
 //==============================================================================================
 //functions called by serial_config_menu in config_file_utils 
 //==============================================================================================
-//functions to change simulator specific settings / configurations are implemented in config_file_utils directly 
-//yeayea i was to lazy to give them proper names
-//==============================================================================================
-void opt_1(); //call it debug output
-void opt_2(); //print current config with changes made by user to serial monitor
-void opt_3(); //change port config (input/output) of an mcp ic
-void opt_5(); //change number of active ICs
 
 void toggle_verbose();//option 6 to toggle verbose output
 
-void commit_config_to_fs();//option 7 for config menu in config_file_utils
+void commit_config_to_fs(int sim);//option 7 for config menu in config_file_utils
 
-void opt_10();//choose which interface should be loaded after reboot
+void choose_sim();//choose which interface should be loaded after reboot
 
 //==============================================================================================
-//let user know that setup is finished by blinking all leds
+//let user know that setup is finished by blinking all leds - not working anymore
 //==============================================================================================
+
 void indicate_finished_setup();
 
 //==============================================================================================

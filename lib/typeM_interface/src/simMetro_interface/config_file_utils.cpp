@@ -278,7 +278,7 @@ bool load_config()
 //change address of a singel IO (I2C address & pin number needed)
 //==========================================================================================================================
 
-static void opt_4() 
+static void opt_1() 
 {
   uint8_t i, t;
   int i2c_adr;
@@ -370,23 +370,19 @@ void serial_config_menu()
     USBSerial.print(F("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"));
     USBSerial.print(F("\nUm Änderungen dauerhaft im Flash-Speicher zu sichern, muss das Konfigurationsmenü über die Option 7 beendet werden. Bei einem Neustart werden ungesicherte Änderungen verworfen.\n"));
     USBSerial.print(F("Auswahlmöglichkeiten zur Fehlersuche und Konfiguration des Fahrpults: \n\n"));  
-    USBSerial.print(F("1 -> Wenn ein Taster/Schalter oder ein analoger Eingang betätigt wird, wird zusätzlich zu dem Datentelegramm der Pin und die I2C Adresse ausgegeben.\n"));
-    USBSerial.print(F("2 -> Ausgabe der aktuellen Konfiguration im CSV style.\n"));
-    USBSerial.print(F("3 -> Ändern der Port-Konfiguration oder der Konfiguration eines einzelnen Pins eines MCP-ICs. Es muss die I2C Addresse bekannt sein.\n"));
-    USBSerial.print(F("4 -> Kanalnummer eines Ein-/ Ausgangs ändern. Es muss die I2C Addresse des dazugehörigen ICs und die Pin-Nummer bekannt sein.\n"));
-    USBSerial.print(F("5 -> Anzahl der MCP oder PCF ICs ändern bzw. I2C Adressen (de-)aktivieren.\n"));
+    USBSerial.print(F("1 -> Kanalnummer eines Ein-/ Ausgangs ändern. Es muss die I2C Addresse des dazugehörigen ICs und die Pin-Nummer bekannt sein.\n"));
     if(VERBOSE){
-        USBSerial.print(F("6 -> Debugging Ausgabe Ausschalten.\n"));
+        USBSerial.print(F("2 -> Debugging Ausgabe Ausschalten.\n"));
     }else{ 
-        USBSerial.print(F("6 -> Debugging Ausgabe Einschalten.\n"));
+        USBSerial.print(F("2 -> Debugging Ausgabe Einschalten.\n"));
     }
-    USBSerial.print(F("7 -> Änderungen Speichern und Konfigurationsmenü beenden.\n"));
-    USBSerial.print(F("8 -> Konfigurationsmenü beenden.\n"));
-    USBSerial.print(F("9 -> Neustart. Nicht gesicherte Änderungen gehen verloren!\n"));
-    USBSerial.print(F("10 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n\n"));
+    USBSerial.print(F("3 -> Änderungen Speichern und Konfigurationsmenü beenden.\n"));
+    USBSerial.print(F("4 -> Konfigurationsmenü beenden.\n"));
+    USBSerial.print(F("5 -> Neustart. Nicht gesicherte Änderungen gehen verloren!\n"));
+    USBSerial.print(F("6 -> Schnittstelle für die Kommunikation mit einem Simulator wählen.\n\n"));
 
     strcpy(info, "Diese Option steht nicht zur verfügung.\nGeben Sie eine der Verfügbaren Optionen ein, oder beenden Sie mit \"C\" das Konfigurationsmenü.\n");
-    if (get_integer_with_range_check(&option, 1, 11, info)) option = 8;   //exit menu, if user entered "C"
+    if (get_integer_with_range_check(&option, 1, 6, info)) option = 4;   //exit menu, if user entered "C"
     
     
     USBSerial.print("\n\n");
@@ -396,33 +392,22 @@ void serial_config_menu()
     switch (option)
     {
         case 1:
-            opt_1(); //unnötig -> in 6 integrieren
+            opt_1();
             break;
         case 2:
-            opt_2(); //unnötig
-            break;
-        case 3:
-            opt_3(); //unnötig -> ändern von ct, ac und dc pins
-            break;
-        case 4:
-            opt_4(); 
-            break;
-        case 5:
-            opt_5();//unnötig
-            break;
-        case 6: 
             toggle_verbose();
             break;
-        case 7:
-            commit_config_to_fs();
+        case 3:
+            USBSerial.println("Diese Funktion wurde noch nicht implementiert.");
+            //commit_config_to_fs(1);
             break;
-        case 8: 
+        case 4://do nothing to escape the menu
             break;
-        case 9: 
+        case 5:
             ESP.restart();
             break;
-        case 10: 
-            opt_10();
+        case 6: 
+            choose_sim();
             break;
         default:
             USBSerial.read();
@@ -444,7 +429,6 @@ void serial_config_menu()
       USBSerial.print(F("\nKonfigurationsmenü beendet.\nUm in das Konfigurationsmenü zu gelangen bitte \"M\" eingeben."));
       USBSerial.print(F("\n\n-------------------------------------------------"));
       USBSerial.print(F("-------------------------------------------------\n\n\n\n\n\n\n\n"));
-      //esc();
     }
 }
 

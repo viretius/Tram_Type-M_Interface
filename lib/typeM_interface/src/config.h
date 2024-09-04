@@ -36,8 +36,7 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 #define DEBOUNCE_DELAY_MS 80         //debounce delay for digital inputs
 
 #define CMD_BUFFER_SIZE 10          // "X"(start) "U"(D/A) "XX"(address) "XXXX"(data) "Y"(end) "\n" 
-#define INFO_BUFFER_SIZE 75         //buffer for infos about inputs, if run_config_task = true  
-#define VERBOSE_BUFFER_SIZE 70 
+#define VERBOSE_BUFFER_SIZE 75         
 
 #define MCP_I2C_BASE_ADDRESS 32     //0x20
 #define PCF_I2C_BASE_ADDRESS 72     //0x48
@@ -110,6 +109,8 @@ extern bool run_config_task;      //if config task is running and user picked op
 */
 extern uint8_t acceleration_button[]; 
 extern uint8_t deceleration_button[];
+extern bool acceleration_button_status;
+extern bool deceleration_button_status;
 extern uint8_t combined_throttle_ic[];
 
 extern TaskHandle_t Task1;   
@@ -119,7 +120,6 @@ extern TaskHandle_t Task4;
 extern TaskHandle_t Task5;
 extern TaskHandle_t Task6;
 
-extern QueueHandle_t serial_tx_info_queue;
 extern QueueHandle_t serial_tx_verbose_queue;
 
 extern SemaphoreHandle_t i2c_mutex;
@@ -154,20 +154,19 @@ extern USBCDC USBSerial;
 
 extern byte mac[]; 
 extern IPAddress host;
-//extern IPAddress client_ip; //has to be configured to match the server's IP address (to be implemented in config_file_utils)
-extern uint16_t port;               //default ZUSI port          
+extern uint16_t port;                         
 
 extern byte handshakedata[]; //data to be sent to server after connection is established
 extern size_t handshakedata_len;
 
 extern byte request[];    //data to be sent to server after handshake 
-#define REQUEST_LEN 27  //length of request array, instead of sizeof(request) because this number is part of the array itself
+#define REQUEST_LEN 27  //length of request array, instead of sizeof(request) because this number is part of the request_array itself
 
 extern byte request_end[];
 extern size_t request_end_len;
 
 typedef struct {
-  char *pld;
+  char *message;
   int count;
 } tcp_payload;
 

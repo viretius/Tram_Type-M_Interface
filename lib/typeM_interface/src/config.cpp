@@ -11,6 +11,8 @@ PCF_Struct pcf_list[MAX_IC_COUNT];
 
 uint8_t acceleration_button[2]; 
 uint8_t deceleration_button[2];
+bool acceleration_button_status = false;
+bool deceleration_button_status = false;
 uint8_t combined_throttle_ic[2];
 
 TaskHandle_t Task1;   //digital input
@@ -20,7 +22,6 @@ TaskHandle_t Task4;   //serial rx / tcp rx
 TaskHandle_t Task5;   //serial tx 
 TaskHandle_t Task6;   //config menu
 
-QueueHandle_t serial_tx_info_queue;
 QueueHandle_t serial_tx_verbose_queue;
 
 SemaphoreHandle_t i2c_mutex;
@@ -42,7 +43,7 @@ byte handshakedata[] = {
 
                         0x02,   // CLIENT_TYPE (1 byte) = Fahrpult
                         0x12,   //ident length
-                                        //"Fahrpult (ESP32S3)"
+                                        //"Fahrpult (ESP32S3"
                         0x46,
                         0x61,
                         0x68,

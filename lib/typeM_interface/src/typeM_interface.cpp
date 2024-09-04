@@ -22,9 +22,14 @@ void init_typeM_interface() {
     if(interface_choice == 2) {
         USBSerial.print(F("LokSim3D Setup...\n"));
         lokSim3D_interface::init();
-    } else  {
+    } else if (interface_choice == 1) {
         USBSerial.print(F("SimMetro Setup...\n"));
         simMetro_interface::init();
+    }
+    else {
+        USBSerial.println("Variable für die Wahl des Simulators entspricht keinem der zulässigen Werte.");
+        USBSerial.println("Wählen Sie im Konfigurationsmenü Option 6, um die Variable anzupassen und führen dann einen Neustart durch");
+        simMetro_config::serial_config_menu();
     }
 }   
 

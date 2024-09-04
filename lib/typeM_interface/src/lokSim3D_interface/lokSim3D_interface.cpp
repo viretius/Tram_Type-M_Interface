@@ -37,17 +37,15 @@ using namespace lokSim3D_config;
 
 namespace lokSim3D_interface {
 
-static bool acceleration_button_status = false;
-static bool deceleration_button_status = false;
+
+static USBHIDKeyboard Keyboard;
+static WiFiClient client;
 
 //========================================================================================================
 //pwm output for buzzer
 //========================================================================================================
 
-void toggle_buzzer(uint8_t pin, float frequency) 
-{
-
-}
+void toggle_buzzer(uint8_t pin, float frequency) {}
 
 //========================================================================================================
 //client handshake with loksim3d server
@@ -57,46 +55,44 @@ void handshake_and_request() {
   size_t len;
   uint8_t *ack;
 
-  
   //vTaskSuspend(Task5);
   
-
-  xQueueSend(serial_tx_verbose_queue, "\nHandshake\n   Handshake wird durchgeführt\n", pdMS_TO_TICKS(1));
+  if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "\nHandshake\n   Handshake wird durchgeführt\n", pdMS_TO_TICKS(1));
   client.write(handshakedata, handshakedata_len);
-  xQueueSend(serial_tx_verbose_queue, "\n   Warte auf ACK vom Server", pdMS_TO_TICKS(1));
+  if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "\n   Warte auf ACK vom Server", pdMS_TO_TICKS(1));
   while (!client.available()) {
     vTaskDelay(pdMS_TO_TICKS(500));
-    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, ".");
+    queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, ".");
   }
 
-  xQueueSend(serial_tx_verbose_queue, "\n   ACK vom Server erhalten:", pdMS_TO_TICKS(1));
+  if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "\n   ACK vom Server erhalten:", pdMS_TO_TICKS(1));
   len = client.available();
   ack = new uint8_t[len+1];
   while (client.available()) 
   {
     client.read((uint8_t*)ack, len);
     ack[len] = '\0';
-    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "%s", ack);
+    if (VERBOSE)  queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "%s", ack);
   }
   delete[] ack; //next ack might have different length -> delete and allocate new memory
 
-  xQueueSend(serial_tx_verbose_queue, "\n   Frage Daten an...", pdMS_TO_TICKS(1));
+  if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "\n   Frage Daten an...", pdMS_TO_TICKS(1));
   client.write(request, REQUEST_LEN);
 
-  xQueueSend(serial_tx_verbose_queue, "\n   Warte auf ACK vom Server", pdMS_TO_TICKS(1));
+  if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "\n   Warte auf ACK vom Server", pdMS_TO_TICKS(1));
   while (!client.available()) {
     vTaskDelay(pdMS_TO_TICKS(500));
-    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, ".");
+    if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, ".");
   }
 
-  xQueueSend(serial_tx_verbose_queue, "\n   ACK vom Server erhalten:", pdMS_TO_TICKS(1));
+  if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "\n   ACK vom Server erhalten:", pdMS_TO_TICKS(1));
   len = client.available();
   ack = new uint8_t[len+1];
   while (client.available()) 
   {
     client.read((uint8_t*)ack, len);
     ack[len] = '\0';
-    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "%s", ack);
+    if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "%s", ack);
   }
   delete[] ack;
 
@@ -108,16 +104,16 @@ void handshake_and_request() {
   {
     client.read((uint8_t*)ack, len);
     ack[len] = '\0';
-    queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "%s", ack);
+    if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "%s", ack);
   }
   delete[] ack;
   /*
     in arduino example:
     after client.write(request_end, request_end_len):
-    read first paket and ignore payload
-    proceed to read actual data
-    do this every time to read new data 
+    read first paket and ignore payload whysoever
+    proceed to read actual data 
   */
+  //first packet with ignored payload
   char c[4];
   client.readBytes(c, sizeof(c));                 //first 4 bytes indicates payload size
           
@@ -126,6 +122,9 @@ void handshake_and_request() {
   char pld[payload_len];
   for(int i = 0; i < payload_len; i ++) { pld[i] = client.read(); }
   
+  //server sends another packet
+  //payload is beeing processed in output task
+
   //vTaskResume(Task5);
 }
 
@@ -138,33 +137,40 @@ void press_and_release_key(KeyReport *keyReport, uint8_t ic_address, uint8_t pin
 {
   //in address there might be something like "ctrl+a" or "ctrl+shift+a" or "a" -> split it and send the keys in the correct order
   char *token = strtok(mcp_list[ic_address].address[pin], "+");
-  while (token != NULL) 
+  uint8_t key_count = 6; //max 6 simultenous keys / report 
+
+  while (token != NULL && key_count > 0) 
   {
     if (strcmp(token, "ctrl") == 0) (*keyReport).modifiers |= KEY_LEFT_CTRL; // "|=" to combine multiple modifier keys instead of overwriting
     else if (strcmp(token, "shift") == 0) (*keyReport).modifiers |= KEY_LEFT_SHIFT;
     else if (strcmp(token, "alt") == 0) (*keyReport).modifiers |= KEY_LEFT_ALT;
     else if (strcmp(token, "gui") == 0) (*keyReport).modifiers |= KEY_LEFT_GUI;
+    else if (strcmp(token, "arrow_left") == 0) (*keyReport).modifiers |= KEY_LEFT_ARROW;
+    else if (strcmp(token, "arrow_right") == 0) (*keyReport).modifiers |= KEY_RIGHT_ARROW;
+    else if (strcmp(token, "arrow_up") == 0) (*keyReport).modifiers |= KEY_UP_ARROW;
+    else if (strcmp(token, "arrow_down") == 0) (*keyReport).modifiers |= KEY_DOWN_ARROW;
     else 
     {  
-      if ((*keyReport).keys[0] == 0) (*keyReport).keys[0] = (uint8_t)token[0]; 
-      else if ((*keyReport).keys[1] == 0) (*keyReport).keys[1] = (uint8_t)token[0];
-      else if ((*keyReport).keys[2] == 0) (*keyReport).keys[2] = (uint8_t)token[0];
-      else if ((*keyReport).keys[3] == 0) (*keyReport).keys[3] = (uint8_t)token[0];
-      else if ((*keyReport).keys[4] == 0) (*keyReport).keys[4] = (uint8_t)token[0];
-      else if ((*keyReport).keys[5] == 0) (*keyReport).keys[5] = (uint8_t)token[0]; //up to 6 keys can be pressed at once
+      if ((*keyReport).keys[0] == 0) (*keyReport).keys[0] = token[0]; 
+      else if ((*keyReport).keys[1] == 0) (*keyReport).keys[1] = token[0];
+      else if ((*keyReport).keys[2] == 0) (*keyReport).keys[2] = token[0];
+      else if ((*keyReport).keys[3] == 0) (*keyReport).keys[3] = token[0];
+      else if ((*keyReport).keys[4] == 0) (*keyReport).keys[4] = token[0];
+      else if ((*keyReport).keys[5] == 0) (*keyReport).keys[5] = token[0]; //up to 6 keys can be pressed at once
+      key_count--;
     }
     token = strtok(NULL, "+");
   }
-  if (eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
-  if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Keyreport: %s", (*keyReport).keys);
+  if (!VERBOSE) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
+  else { queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Keyreport: %s", (*keyReport).keys); }
 
   //wait a bit before "releasing" the keys
-  vTaskDelay(pdMS_TO_TICKS(30));
+  /*vTaskDelay(pdMS_TO_TICKS(30));
   //clear keyreport and send to queue
   memset(keyReport, 0, sizeof(KeyReport));
-  if (eTaskGetState(Task6) != eRunning) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
-  if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n  Keyreport: %s", (*keyReport).keys);
-
+  if (!VERBOSE) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
+  else { queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Keyreport: %s", (*keyReport).keys); }
+*/
 }
 
 
@@ -183,7 +189,7 @@ void digital_input_task (void * pvParameters)
   uint16_t ab_flag = 0b0;     //set bit indicates, which pin of a port changed 
   
   KeyReport keyReport;  
-  char info_buffer[INFO_BUFFER_SIZE] = {'\0'};
+  char verbose_buffer[VERBOSE_BUFFER_SIZE] = {'\0'};
   char data[5];                         //4 chars + nullterminator
   uint8_t t, i, j;                      //lokal for-loop counter
 
@@ -232,7 +238,7 @@ void digital_input_task (void * pvParameters)
         char *port = new char[17]{'\0'};
         memset(port, '\0', 17);
         for (int j = 0; j < 16; j++) { strcat(port, (CHECK_BIT(readingAB, j) ? "1" : "0")); }
-        queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[digital_input_task]\n  GPIO Register: %s\n", port);
+        queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[digital_input_task]\n  GPIO Register: %s\n", port);
       }
 
       if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS) 
@@ -252,30 +258,21 @@ void digital_input_task (void * pvParameters)
         if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == acceleration_button[1]) continue; 
         if(i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == deceleration_button[1]) continue; 
       
-        memset(&keyReport, 0, sizeof(KeyReport));                                  
-        press_and_release_key(&keyReport, i, t); //set keyReport according to the pin that changed its state and send to queue
-      }             
-        
-      if(eTaskGetState(Task6) == eRunning) //user 
-      {
-        memset(&info_buffer[0], '\0', INFO_BUFFER_SIZE);              //clear cmd char array
-        strcpy(info_buffer, "\n[digital_input_task]\n  Pin: ");
-          
-        if (t>7) {
-          strcat(info_buffer, "B");
-          strcat(info_buffer, String(t-8).c_str());
-        }
-        else {
-          strcat(info_buffer, "A");
-          strncat(info_buffer, String(t).c_str(), 1);
+        if (VERBOSE) 
+        {
+          snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
+            "\n[digital_input_task]\n  Pin: %c%d\n  I2C-Adresse (DEC): %d\n",
+            (t > 7) ? 'B' : 'A', 
+            (t > 7) ? t - 8 : t,
+            i + MCP_I2C_BASE_ADDRESS
+          );
+          xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(1));
         }
 
-        strcat(info_buffer, "\n  I2C-Adresse (DEC): ");
-        strcat(info_buffer, String(i+MCP_I2C_BASE_ADDRESS).c_str());
-        //strcat(info_buffer, keyReport.keys);
-        strcat(info_buffer, "\n");
-        xQueueSend(serial_tx_info_queue, &info_buffer, pdMS_TO_TICKS(1));
-      }              
+        memset(&keyReport, 0, sizeof(KeyReport));                                  
+        press_and_release_key(&keyReport, i, t); //set keyReport according to the pin that changed its state and send to queue
+                 
+      }   
     }
 
   } 
@@ -289,7 +286,7 @@ void analog_input_task (void * pvParameters) //needs
 {
   
   char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'}; 
-  char info_buffer[INFO_BUFFER_SIZE] = {'\0'}; 
+  char verbose_buffer[VERBOSE_BUFFER_SIZE] = {'\0'}; 
   char data[5];
 
   bool acceleration_button_status = 0;
@@ -297,9 +294,6 @@ void analog_input_task (void * pvParameters) //needs
 
   uint8_t reading[4];           //every pcf-IC has 4 analog inputs
   uint8_t t, i, j;              //lokal for-loop counter
-
-  TickType_t intervall = pdMS_TO_TICKS(1000); //needed for debug output
-  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
 
   for(;;)
   {
@@ -318,7 +312,7 @@ void analog_input_task (void * pvParameters) //needs
         
         if (reading[t] > pcf_list[i].last_reading[t] + ADC_STEP_THRESHOLD || reading[t] < pcf_list[i].last_reading[t] - ADC_STEP_THRESHOLD)// || reading[t] <= ADC_STEP_THRESHOLD || reading[t] >= 255-ADC_STEP_THRESHOLD ) //filter out inaccuracy of mechanics and the ADC
         {
-          if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading[t]);
+          if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Wert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading[t]);
           
           if (reading[t] <= ADC_STEP_THRESHOLD) reading[t] = 0;
           else if (reading[t] >= 255 - ADC_STEP_THRESHOLD) reading[t] = 255;
@@ -329,50 +323,44 @@ void analog_input_task (void * pvParameters) //needs
 
           memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE); //clear cmd char array
 
-          char kanal[3] = {0,0, 0};
-          memset(&kanal[0], '\0', 3); //clear cmd char array
+          char address[3] = {0,0, 0};
+          memset(&address[0], '\0', 3); //clear cmd char array
 
           if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1]) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
           { 
-            if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);            
-
             if (acceleration_button_status) 
             {
-              USBSerial.println("beschleunigen");
-              strcat( kanal, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
+              USBSerial.println("  beschleunigen");
+              strcat( address, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
             }
             else if (deceleration_button_status) 
             {
-              USBSerial.println("bremsen");
-              strcat( kanal, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+              USBSerial.println("  bremsen");
+              strcat( address, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
             }
-            else if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[analog input]\n  Kein Button gedrückt.\n");
+            else if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Kombihebel betätigt. Richtung kann aber nicht ermittelt werden.\n");
             else continue;
           }
-          else strcat(kanal, pcf_list[i].address[t]); //just any other analog input
+          else strcat(address, pcf_list[i].address[t]); //just any other analog input
           
-          /*create command-string
-          strcat(cmd_buffer, "XV");
-          strcat(cmd_buffer, kanal);   
-          strcat(cmd_buffer, data);
-          strcat(cmd_buffer, "Y");
+          //nprintf(cmd_buffer, CMD_BUFFER_SIZE, "XV%02s%sY", address, data);
+
                
           //if (!VERBOSE && eTaskGetState(Task6) != eRunning) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
-          */
-          if(eTaskGetState(Task6) == eRunning) //user 
+          
+         //make keyreport...
+         //press_and_release_key(keyreport);
+          if(VERBOSE) 
           {
-            memset(&info_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array
+            memset(&verbose_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array
 
-            //create string "Pin: XXX\nI2C-Adresse: 0xXX"
-            strcpy(info_buffer, "Pin: ");
-            strcat(info_buffer, String(t).c_str());
+            strcat(verbose_buffer, "\n[analog input]\n  I2C-Adresse (DEC): ");
+            strcat(verbose_buffer, String(i+PCF_I2C_BASE_ADDRESS).c_str());
+            strcpy(verbose_buffer, "  Pin: ");
+            strcat(verbose_buffer, String(t).c_str());
+            strcat(verbose_buffer, "\n");
 
-            strcat(info_buffer, "\n[analog input]\n  I2C-Adresse (DEC): ");
-            strcat(info_buffer, String(i+PCF_I2C_BASE_ADDRESS).c_str());
-            strcat(info_buffer, cmd_buffer);
-            strcat(info_buffer, "\n");
-
-            xQueueSend(serial_tx_info_queue, &info_buffer, pdMS_TO_TICKS(1));
+            xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(1));
           }                                           
         }
       }
@@ -386,8 +374,7 @@ set outputs according to received data over USBSerial connection
 */
 
 void output_task(void * pvParameters)
-{ 
-  
+{  
   tcp_payload payload;
   
   uint8_t t, i;                    //lokal for-loop counter
@@ -396,22 +383,24 @@ void output_task(void * pvParameters)
   for(;;)
   {
     vTaskDelay(5);
-    xQueueReceive(tcp_rx_cmd_queue, &payload, portMAX_DELAY); //block this task, if queue is empty
+    xQueueReceive(tcp_rx_queue, &payload, portMAX_DELAY); //block this task, if queue is empty
     
-    if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  TCP Datenpaket empfangen: %s\n", payload.pld);
-    int command_index = 2;      //skip the first two bytes
-    int value_index = 3;        //skip the first two bytes
+    if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[output task]\n  TCP Datenpaket empfangen: %s\n", payload.message);
+    
+    //skip the first two bytes (indicate number of bytes? / number of commands?, that have been transmitted)
+    int command_index = 2;      
+    //command consistst of two chars (a number between 0 and 99), 
+    //value_index is being castet and interpreted differently depending on command type
+    int value_index = 3;   
 
     for (i = 0; i < payload.count; i++) 
     {
-      if(VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[output task]\n  Befehl: %s\n  Wert: %s", payload.pld[command_index], payload.pld[value_index]);
+      if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[output task]\n  Befehl: %s\n  Wert: %s", payload.message[command_index], payload.message[value_index]);
 
+      float value_cast_to_float = *((float *)&payload.message[value_index]); //"Single"
+      int value_cast_to_int = *((int *)&payload.message[value_index]);      //"enum" based on value different actions are performed
 
-      float value_cast_to_float = *((float *)&payload.pld[value_index]); //"Single"
-      int value_cast_to_int = *((int *)&payload.pld[value_index]);      //"enum" based on value different actions are performed
-
-      int command = atoi(&payload.pld[command_index]);
-      
+      int command = atoi(&payload.message[command_index]);
 
       switch (command) 
       {
@@ -510,11 +499,12 @@ receive data and add to according queues
 
 void rx_task (void * pvParameters) //also usbserial rx task for config menu
 {
-  char buffer[CMD_BUFFER_SIZE];
+  char buffer[2]; //receive a single char with serial monitor if available. 
+
   uint8_t t, i;  
   tcp_payload payload;
 
-  TickType_t request_interval = pdMS_TO_TICKS(80); 
+  TickType_t request_interval = pdMS_TO_TICKS(60); 
   TickType_t last_request = xTaskGetTickCount();       
 
   TickType_t request_timeout = pdMS_TO_TICKS(5000); // 5 seconds timeout
@@ -526,22 +516,24 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
 
     if (USBSerial.available() > 0) 
     {
-      USBSerial.readBytesUntil('\n', buffer, CMD_BUFFER_SIZE);                            
+      USBSerial.readBytesUntil('\n', buffer, 2);                            
       if (buffer[0] == 'M' || buffer[0] == 'm')  vTaskResume(Task6);
+      vTaskDelay(pdMS_TO_TICKS(100));
     }
 
-
-    if (client.connected() && ESP32_W5500_eth_connected && xTaskGetTickCount() - last_request > request_interval) 
+    if (ESP32_W5500_eth_connected && client.connected() && xTaskGetTickCount() - last_request > request_interval) 
     {
       last_request = xTaskGetTickCount();
+      
+      handshake_and_request();  //send request to server
 
+      //wait for
       while (!client.available() && (xTaskGetTickCount() - request_time) < request_timeout) {
           vTaskDelay(request_interval); 
       }
 
       if (client.available()) 
       {
-          handshake_and_request();  //send request to server
           uint8_t c[4];
           client.readBytes(c, sizeof(c));  //first 4 bytes indicates payload size
           
@@ -560,16 +552,16 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
           {
             if (payload_len > 3)               //????????why?????????
             {
-              payload.pld = new char[payload_len];
-              memcpy(payload.pld, pld, payload_len);
+              payload.message = new char[payload_len];
+              memcpy(payload.message, pld, payload_len);
               payload.count = count;              
-              xQueueSend(tcp_rx_cmd_queue, &payload, pdMS_TO_TICKS(1));
+              xQueueSend(tcp_rx_queue, &payload, pdMS_TO_TICKS(1));
             }
           }
       } 
       else 
       {   
-          if (VERBOSE) queue_printf(serial_tx_verbose_queue, VERBOSE_BUFFER_SIZE, "\n[rx_task]\n  Timeout: Keine Daten vom LOKSIM3D-Server empfangen.\nClient wird neu verbunden.\n");
+          if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[rx_task]\n  Timeout: Keine Daten vom LOKSIM3D-Server empfangen.\nClient wird neu verbunden.\n");
           if (ESP32_W5500_eth_connected) 
           {
             client.stop();
@@ -598,18 +590,16 @@ void tx_task (void * pvParameters)
   } KeyReport;*/
   KeyReport keyReport;
 
-  char buffer[INFO_BUFFER_SIZE]; //only one buffer -> overwrite content after USBSerial.print
+  char buffer[VERBOSE_BUFFER_SIZE]; //only one buffer -> overwrite content after USBSerial.print
 
   for(;;)
   {
     vTaskDelay(5);
 
-    if (xQueueReceive(keyboard_tx_queue, &keyReport, 1) == pdTRUE)    Keyboard.sendReport(&keyReport);
+    if (xQueueReceive(keyboard_tx_queue, &keyReport, 0) == pdTRUE)    Keyboard.sendReport(&keyReport);
      
-    if (xQueueReceive(serial_tx_verbose_queue, &buffer, 1) == pdTRUE)     USBSerial.print(buffer);
-    
-    if (eTaskGetState(Task6) == eRunning && xQueueReceive(serial_tx_info_queue, &buffer, 1) == pdTRUE)   USBSerial.print(buffer);
-    
+    if (VERBOSE && xQueueReceive(serial_tx_verbose_queue, &buffer, 0) == pdTRUE)     USBSerial.print(buffer);
+        
   }
 }
 
@@ -621,17 +611,9 @@ void tx_task (void * pvParameters)
 
 void config_task (void * pvParameters)
 {
-  TickType_t intervall = pdMS_TO_TICKS(1000); //needed for debug output
-  TickType_t last_stackhighwatermark_print = xTaskGetTickCount(); //needed for debug output
-
   for(;;)
   {
     vTaskDelay(5);
-
-    if (xTaskGetTickCount() - last_stackhighwatermark_print >= intervall) {
-      last_stackhighwatermark_print = xTaskGetTickCount();
-      queue_printf(serial_tx_info_queue, INFO_BUFFER_SIZE, "\n\nconfig- Free Stack Space: %d", uxTaskGetStackHighWaterMark(NULL));
-    }
 
     //suspend tasks to prevent data corruption
     vTaskSuspend(Task1);      //digital input task
@@ -639,9 +621,9 @@ void config_task (void * pvParameters)
     vTaskSuspend(Task4);      //USBSerial rx task     
     vTaskSuspend(Task5);      //USBSerial tx task
 
-    serial_config_menu();  //tasks 1,2&5 can be resumed from within this function
+    serial_config_menu();  
 
-    if (!run_config_task) //
+    if (!run_config_task) 
     {
       vTaskResume(Task1);
       vTaskResume(Task2);
@@ -672,25 +654,24 @@ void init()
     -1 slot with size of an integer, FIFO principal, stores commands "executed" in output_task
     -only for com between tasks. only one command (of size (CMD_BUFFER_SIZE)) large, because the hardware rx buffer of the esp32 is 256 bytes large
     */
-    tcp_rx_cmd_queue = xQueueCreate(2, sizeof(tcp_payload)); 
-    keyboard_tx_queue = xQueueCreate(2, sizeof(KeyReport));   //stores commands, that are created in both input-tasks and then transmitted by the tx task 
-    serial_tx_info_queue = xQueueCreate(3, INFO_BUFFER_SIZE); //stores i2c address and MCP Pin, if run_config_task==true  
-    serial_tx_verbose_queue = xQueueCreate(5, VERBOSE_BUFFER_SIZE); //other stuff that can be helpfull for debugging
+    tcp_rx_queue = xQueueCreate(4, sizeof(tcp_payload)); 
+    keyboard_tx_queue = xQueueCreate(4, sizeof(KeyReport));   //stores commands, that are created in both input-tasks and then transmitted by the tx task 
+
+    serial_tx_verbose_queue = xQueueCreate(4, VERBOSE_BUFFER_SIZE*sizeof(char)); //stores i2c address and MCP Pin, if run_config_task==true      
     
     i2c_mutex = xSemaphoreCreateMutex();
     xTaskCreate(digital_input_task, "Task1", 2000, NULL, 1, &Task1);
     xTaskCreate(analog_input_task, "Task2", 2000, NULL, 1, &Task2);
     xTaskCreate(output_task, "Task3", 2000, NULL, 1, &Task3);
-    xTaskCreatePinnedToCore(tx_task, "Task5", 2000, NULL, 1, &Task5, 0);
+    xTaskCreate(tx_task, "Task5", 2000, NULL, 1, &Task5);
     //open config menu from within this task
-    xTaskCreatePinnedToCore(
+    xTaskCreate(
       rx_task,              /* Task function. */
       "Task4",              /* name of task. */
       2000,                 /* Stack size */
       NULL,                 /* optional parameters*/
       1,                    /* priority */
-      &Task4,               /* Task handle to keep track of created task */
-      0                     /*pinned to core 0*/
+      &Task4               /* Task handle to keep track of created task */
     );
     xTaskCreate(config_task, "Task6", 8000, NULL, 1, &Task6);
     vTaskSuspend(Task6);
