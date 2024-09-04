@@ -155,8 +155,6 @@ namespace simMetro_interface {
   uint8_t reading[4];           //every pcf-IC has 4 analog inputs
   uint8_t t, i, j;              //lokal for-loop counter
 
-  TickType_t intervall = pdMS_TO_TICKS(1000); //needed for debug output
-
   for(;;)
   {
     vTaskDelay(5);
