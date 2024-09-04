@@ -127,7 +127,7 @@ namespace simMetro_interface {
         
         else {
           snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
-            "\n[digital_input_task]\n  Pin: %c%d\n  I2C-Adresse (DEC): %d\nDatentelegram: %s",
+            "\n  Pin: %c%d\n  I2C-Adresse (DEC): %d\nDatentelegram: %s",
             (t > 7) ? 'B' : 'A', 
             (t > 7) ? t - 8 : t,
             i + MCP_I2C_BASE_ADDRESS,
@@ -171,9 +171,7 @@ namespace simMetro_interface {
         } else {continue;}                                            
         
         if (reading[t] > pcf_list[i].last_reading[t] + ADC_STEP_THRESHOLD || reading[t] < pcf_list[i].last_reading[t] - ADC_STEP_THRESHOLD)// || reading[t] <= ADC_STEP_THRESHOLD || reading[t] >= 255-ADC_STEP_THRESHOLD ) //filter out inaccuracy of mechanics and the ADC
-        {
-          if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Wert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading[t]);
-          
+        {          
           if (reading[t] <= ADC_STEP_THRESHOLD) reading[t] = 0;
           else if (reading[t] >= 255 - ADC_STEP_THRESHOLD) reading[t] = 255;
 
@@ -181,30 +179,34 @@ namespace simMetro_interface {
 
           sprintf(data, "%04X", reading[t]);    
 
-          memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE); //clear cmd char array
-
           char address[3] = {0,0, 0};
           memset(&address[0], '\0', 3); 
 
           //combined throttle
-          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1]) //&& reading[t] >= ADC_STEP_THRESHOLD && reading[t] <= 25 - ADC_STEP_THRESHOLD) ;
+          if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1])
           { 
-            if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Wert an Kombi-Hebel: %u\n", reading[t]);            
-
             if (acceleration_button_status) 
             {
-              if (VERBOSE) USBSerial.println("beschleunigen");
+              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Beschleunigen.\n");
               strcat( address, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
             }
             else if (deceleration_button_status) 
             {
-              if (VERBOSE) USBSerial.println("bremsen");
+              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Bremsen.\n");
               strcat( address, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
             }
-            else if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Kein Button gedrückt.\n");
-            else continue;
+            else {
+              reading[t] = 0;
+              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Mittelstellung.\n");
+            }
+            if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "  Wert an Kombi-Hebel: %u\n", reading[t]);            
           }
-          else strncat(address, pcf_list[i].address[t], 2); //just any other analog input
+            
+          else //some analog input 
+          {
+            strncat(address, pcf_list[i].address[t], 2); //just any other analog input
+            if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Wert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading[t]);
+          }
           
           //create command-string
           snprintf(cmd_buffer, CMD_BUFFER_SIZE, "XV%02s%04sY", address, data);
@@ -212,7 +214,7 @@ namespace simMetro_interface {
           if (!VERBOSE) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
           else {
             snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
-              "\n[analog_input_task]\n  Pin: %d\n  I2C-Adresse (DEC): %d\nDatentelegram: %s",
+              "\n  Pin: %d\n  I2C-Adresse (DEC): %d\nDatentelegram: %s",
               t,
               i + PCF_I2C_BASE_ADDRESS,
               cmd_buffer
