@@ -38,7 +38,7 @@ void ESP32_W5500_event(WiFiEvent_t event)
 
     case ARDUINO_EVENT_ETH_CONNECTED:
       ET_LOG(F("\nETH Connected"));
-      ET_LOG(F("\nETH waiting for IP"));
+      ET_LOG(F("ETH waiting for IP"));
       break;
 
     case ARDUINO_EVENT_ETH_GOT_IP:
@@ -86,21 +86,21 @@ void ESP32_W5500_event(WiFiEvent_t event)
       break;
 
     case SYSTEM_EVENT_ETH_CONNECTED:
-      ET_LOG(F("\nETH Connected"));
+      ET_LOG(F("ETH Connected"));
       break;
 
     case SYSTEM_EVENT_ETH_GOT_IP:
       if (!ESP32_W5500_eth_connected)
       {
-        ET_LOG3(F("\nETH MAC: "), ETH.macAddress(), F(", IPv4: "), ETH.localIP());
+        ET_LOG3(F("ETH MAC: "), ETH.macAddress(), F(", IPv4: "), ETH.localIP());
 
         if (ETH.fullDuplex())
         {
-          ET_LOG0(F("\nFULL_DUPLEX, "));
+          ET_LOG0(F("FULL_DUPLEX, "));
         }
         else
         {
-          ET_LOG0(F("\nHALF_DUPLEX, "));
+          ET_LOG0(F("HALF_DUPLEX, "));
         }
 
         ET_LOG1(ETH.linkSpeed(), F("Mbps"));
@@ -111,7 +111,7 @@ void ESP32_W5500_event(WiFiEvent_t event)
       break;
 
     case SYSTEM_EVENT_ETH_DISCONNECTED:
-      ET_LOG("\nETH Disconnected");
+      ET_LOG("ETH Disconnected");
       ESP32_W5500_eth_connected = false;
       break;
 
