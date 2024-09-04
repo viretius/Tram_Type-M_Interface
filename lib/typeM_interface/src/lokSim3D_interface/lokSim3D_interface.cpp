@@ -38,9 +38,6 @@ using namespace lokSim3D_config;
 namespace lokSim3D_interface {
 
 
-static USBHIDKeyboard Keyboard;
-static WiFiClient client;
-
 //========================================================================================================
 //pwm output for buzzer
 //========================================================================================================
@@ -136,8 +133,8 @@ void handshake_and_request() {
 void press_and_release_key(uint8_t ic_address, uint8_t pin) 
 {
   KeyReport *keyReport;
-  memset(&keyReport, 0, sizeof(KeyReport));  
-  if (ic_address == NULL || pin == NULL) //send empty report (aka no key pressed)
+  memset(&keyReport[0], 0, sizeof(KeyReport));  
+  if (ic_address == 255 || pin == 255) //send empty report (aka no key pressed)
   {
     if (!VERBOSE) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
     else { queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Keyreport: %s", (*keyReport).keys); }
@@ -285,7 +282,7 @@ void digital_input_task (void * pvParameters)
           press_and_release_key(i, t); //send keyReport according to the pin that changed its state and send to queue
           //else release key:
           vTaskDelay(50);
-          press_and_release_key(NULL, NULL);
+          press_and_release_key(255, 255); //255 to indicate no keypress
         //else if button: 
           //press_and_release_key(i, t); //send keyReport according to the pin that changed its state and send to queue
           //vTaskDelay(50);
@@ -531,8 +528,8 @@ void rx_task (void * pvParameters) //also usbserial rx task for config menu
     vTaskDelay(5);
 
     if (USBSerial.available() > 0) 
-    {                       
-      if (USBSerial.peek() ==  'M' || USBSerial.peek() == 'm')  vTaskResume(Task6);
+    {
+      if (USBSerial.peek() == 'M' || USBSerial.peek() == 'm')  vTaskResume(Task6);
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 

@@ -13,6 +13,9 @@ namespace lokSim3D_interface {
    
     void init();  
 
+    static USBHIDKeyboard Keyboard;
+    static WiFiClient client;
+
     static QueueHandle_t tcp_rx_queue;
     static QueueHandle_t keyboard_tx_queue;
 
