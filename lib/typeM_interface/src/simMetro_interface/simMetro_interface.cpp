@@ -118,17 +118,12 @@ namespace simMetro_interface {
         if (!CHECK_BIT(ab_flag, t)) continue;      
         if(i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == acceleration_button[1]) continue; 
         if(i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS && t == deceleration_button[1]) continue; 
-        
-        memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);              //clear cmd char array                       
-              
+                      
         (ab_flag & readingAB) ? strcpy(data, "0000") : strcpy(data, "0001") ;   //check wether the pin changed from 0 to 1 or 1 to 0 and store according char to "data" variable, inverted because of the implementation in the simulation programm
               
-        strcat(cmd_buffer, "XU");         //create command-string like "XU" + "00" + "0000" + "Y"
-        strcat(cmd_buffer, mcp_list[i].address[t]);
-        strcat(cmd_buffer, data);
-        strcat(cmd_buffer, "Y");
+        snprintf(cmd_buffer, CMD_BUFFER_SIZE, "XU%02s%04sY", mcp_list[i].address[t], data);
                           
-        if ((!VERBOSE)) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
+        if ((!VERBOSE)) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1));  
         
         else {
           snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
