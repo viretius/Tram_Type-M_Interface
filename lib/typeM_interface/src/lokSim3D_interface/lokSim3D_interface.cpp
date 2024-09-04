@@ -137,6 +137,12 @@ void press_and_release_key(uint8_t ic_address, uint8_t pin)
 {
   KeyReport *keyReport;
   memset(&keyReport, 0, sizeof(KeyReport));  
+  if (ic_address == nullptr || pin == nullptr) //send empty report (aka no key pressed)
+  {
+    if (!VERBOSE) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
+    else { queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Keyreport: %s", (*keyReport).keys); }
+    return;
+  }
   
   //in address there might be something like "ctrl+a" or "ctrl+shift+a" or "a" -> split it and send the keys in the correct order
   char *token = strtok(mcp_list[ic_address].address[pin], "+");
@@ -173,7 +179,7 @@ void press_and_release_key(uint8_t ic_address, uint8_t pin)
   memset(keyReport, 0, sizeof(KeyReport));
   if (!VERBOSE) xQueueSend(keyboard_tx_queue, &keyReport, pdMS_TO_TICKS(1));
   else { queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Keyreport: %s", (*keyReport).keys); }
-*/
+  */
 }
 
 
@@ -272,9 +278,18 @@ void digital_input_task (void * pvParameters)
         }
 
         //how to differentiate between button / switch ?? another entry in config file??? >:(
+        //or is it possible to change settings of the sim?
         //e.g. button for horn and switch for light
-        press_and_release_key(i, t); //send keyReport according to the pin that changed its state and send to queue
-                 
+        //if switch: send report according to (ab_flag & readingAB) bit operation
+          //if true:
+          press_and_release_key(i, t); //send keyReport according to the pin that changed its state and send to queue
+          //else release key:
+          vTaskDelay(50);
+          press_and_release_key(nullptr, nullptr);
+        //else if button: 
+          //press_and_release_key(i, t); //send keyReport according to the pin that changed its state and send to queue
+          //vTaskDelay(50);
+          //press_and_release_key(nullptr, nullptr);
       }   
     }
 
