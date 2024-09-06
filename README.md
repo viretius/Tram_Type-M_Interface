@@ -17,3 +17,7 @@ Follow the steps below to perform a fresh upload to an ESP32S3:
 3. **Upload Firmware**
 
    Upload `firmware.bin` to address `0x10000` (factory).
+
+## To-Do
+- [ ] Evaluating the data packets for LokSim3D and setting the outputs accordingly
+- [ ] Store Config in Header-Files instead of using Filesystem
