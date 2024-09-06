@@ -2,7 +2,7 @@
 
 ![Bild](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)
 
-*Quelle: [Link zur Bildquelle](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)*
+*[https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)*
 
 
 ## Initial Setup using PlatformIO
