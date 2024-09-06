@@ -2,7 +2,7 @@
 
 ![Bild](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)
 
-<font size="6">Quelle: <a href="https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg">https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg</a></font>
+<font size="1"><a href="https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg">https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg</a></font>
 
 ## Initial Setup using PlatformIO
 
