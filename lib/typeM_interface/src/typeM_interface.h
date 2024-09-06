@@ -1,10 +1,10 @@
 #pragma once
 
 #include <Arduino.h>
-#include <config.h>
+#include <globals.h>                  
 #include <utils.h>
-#include <simMetro_interface/simMetro_interface.h>
-#include <lokSim3D_interface/lokSim3D_interface.h>
+#include <thmSim/thmSim_interface.h>
+#include <lokSim3D/lokSim3D_interface.h>
 
 void init_typeM_interface();
 

@@ -8,7 +8,7 @@ void init_typeM_interface() {
 
     USBSerial.begin();
     USB.begin();
-    while(!USBSerial);
+    while(!USBSerial){;};
     find_and_print_partitions();
     
     //====================================================================================
@@ -17,19 +17,19 @@ void init_typeM_interface() {
 
     //load variable from NVS to determine which interface to use
     preferences.begin("APP", true, "nvs");
-    uint8_t interface_choice = preferences.getUInt("app_setting", 0);
+    uint8_t interface_choice = preferences.getUInt("app_settings", 0);
     preferences.end();
     if(interface_choice == 2) {
-        USBSerial.print(F("LokSim3D Setup...\n"));
+        USBSerial.print(F("Schnittstelle wird für LokSim3D initialisiert...\n"));
         lokSim3D_interface::init();
     } else if (interface_choice == 1) {
-        USBSerial.print(F("SimMetro Setup...\n"));
-        simMetro_interface::init();
+        USBSerial.print(F("Schnittstelle wird für THM-Simulator initialisiert...\n"));
+        thmSim_interface::init();
     }
     else {
         USBSerial.println("Variable für die Wahl des Simulators entspricht keinem der zulässigen Werte.");
         USBSerial.println("Wählen Sie im Konfigurationsmenü Option 6, um die Variable anzupassen und führen dann einen Neustart durch");
-        simMetro_config::serial_config_menu();
+        thmSim_config::serial_config_menu();
     }
 }   
 

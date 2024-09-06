@@ -1,0 +1,486 @@
+// (C) ZUSI3 Steuerung für Arduino Mega 2560
+// Folgende Funktionen müssen noch Implementiert werden:
+// - Tastenbefehle welche die Tasten Befehl 40, Frei und Wachsam vom Arduino auf den PC übersetzt
+// - Tastenbefehle für Fahrtrichtung V/R
+// - Tastenbefehle für SIFA
+// - Tastenbefehle für Federspeicher Anlegen/Lösen
+// - Tastenbefehle für Sanden / Mg-Bremse
+// - Tastenbefehle für Hauptschalter / Stromabnehmer
+// - HL HBL Werte Ausgabe über PWM an Schrittmotoren
+// - Geschwindigkeitsausgabe über PWM an Schrittmotor
+#include <Arduino.h>
+#include <SPI.h>
+#include <Ethernet.h>          //<Ehternet2.h>
+#include <Wire.h>              // Verkabelung
+// in “20, 4” ändern wenn 20x04 benutzt wird
+boolean running = false;
+unsigned long interval = 500;     // the time we need to wait
+unsigned long previousMillis = 0; // millis() returns an unsigned long.
+
+byte ZusiIP[4] = {192, 168, 178, 34};
+float vv;
+int hll = 0;
+int n = 0;
+int nn = 0;
+int f = 1;
+int x = 0;
+int vIst;
+int Tacho = 7;
+byte mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x1D, 0x8E};
+IPAddress ip(192, 168, 178, 44);     // ip Adresse Arduino Ethernet Shield
+IPAddress server(192, 168, 178, 34); // ip Adresse Zusi3
+
+// Byte Serie zum Verbindungsaufbau
+uint8_t Anmeldung[] = {0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x2, 0x0, 0x4, 0x0, 0x0, 0x0, 0x2, 0x0, 0x2, 0x0, 0xA, 0x0,
+                       0x0, 0x0, 0x3, 0x0, 0x46, 0x61, 0x68, 0x72, 0x70, 0x75, 0x6C, 0x74, 0x5, 0x0, 0x0, 0x0, 0x4, 0x0, 0x32, 0x2E, 0x30, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+// Byte Serie der angeforderten Daten, die der Server senden soll
+uint8_t Abfrage[] = {0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0xA, 0x0,
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0,  // Geschwindigkeit m/s
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x2, 0x0,  // Druck Hauptluftleitung
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x3, 0x0,  // Druck Bremszylinder
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x4, 0x0,  // Druck Hauptluftbehälter
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1D, 0x0, // MG-Bremse
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x25, 0x0, // Fahrtrichtung Vorne
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x26, 0x0, // Fahrtrichtung Rueck
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x57, 0x0, // Zustand Federspeicherbremse
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9, 0x0,  // Zugkraft gesamt
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x13, 0x0, // Hauptschalter
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x15, 0x0, // Fahrstufe
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x20, 0x0, // LM Hochabbremsung Aus/Ein
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1b, 0x0, // LM Schleudern
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x1c, 0x0, // LM Gleiten
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x64, 0x0, // SIFA
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x65, 0x0, // Zugsicherung
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x66, 0x0, // Türen           <<<<<  T Ü R E N  >>>>>
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x7c, 0x0, // Zugkraft gesamt Steuerwagen
+                     0x4, 0x0, 0x0, 0x0, 0x1, 0x0, 0x85, 0x0, // Fahrstufe Steuerwagen
+                     0xFF, 0xFF, 0xFF, 0xFF,
+                     0xFF, 0xFF, 0xFF, 0xFF,
+                     0xFF, 0xFF, 0xFF, 0xFF};
+
+EthernetClient client;
+
+union // Datentyp zur Abfrage des Knotens
+{
+  byte b[4];
+  int i;
+} dataLng;
+
+union
+{
+  byte b[2];
+  int16_t i;
+} dataGroup;
+
+int ebene = 0;
+int16_t ebene1Status = 0;
+int16_t ebene2Status = 0;
+int16_t ebene3Status = 0;
+int16_t ebene4Status = 0;
+
+int count; // Testvariable für TEST LED blinken
+
+union
+{
+  byte b[4];
+  float f;
+  int i;
+  int16_t i16;
+} nutzdata;
+
+#define MAX_NUTZDATA 4
+
+uint8_t clientForceRead()
+{
+  while (!client.available())
+  {
+  }
+  return client.read();
+}
+
+// Hauptprogramm
+void setup()
+{
+  // Aus und Eingänge festlegen
+  pinMode(21, OUTPUT); // PIN21 AUSGANG LM SCHLEUDERN
+  pinMode(22, OUTPUT); // PIN22 Ausgang LM hohe Abbremsung ein
+  pinMode(23, OUTPUT); // PIN23 Ausgang LM TAV
+  pinMode(24, OUTPUT); // PIN24 Ausgang TT LINKS
+  pinMode(25, OUTPUT); // PIN25 Ausgang TT RECHTS
+  pinMode(26, OUTPUT); // PIN26 Ausgang LM SIFA
+  pinMode(27, OUTPUT); // PIN27 Ausgang LM 55
+  pinMode(28, OUTPUT); // PIN28 Ausgang LM 99
+  pinMode(29, OUTPUT); // PIN29 Ausgang LM 70
+  pinMode(30, INPUT);  // PIN30 Eingang Lampentest MFA
+  pinMode(31, OUTPUT); // PIN31 Ausgang LM 85
+  pinMode(32, INPUT);  // PIN32 Eingang Beleuchtung MFA heller
+  pinMode(33, OUTPUT); // PIN33 Ausgang LM Befehl 40
+  pinMode(34, INPUT);  // PIN34 Eingang Beleuchtung MFA dunkler
+  pinMode(35, OUTPUT); // PIN35 Ausgang LM 500Hz
+  pinMode(37, OUTPUT); // PIN37 Ausgang LM 1000Hz
+  pinMode(38, OUTPUT); // PIN38 Ausgang PZB Summer
+
+  Ethernet.begin(mac, ip); // Zuordnung von IP und MAC an das Shield
+  Serial.begin(115200);    // serielle Schnittstelle am USB Anschluss für Debugging
+  Serial1.begin(19200);    // serielle Ausgabe an den nächsten µC (falls vorhanden) für die Zeiger und Lampenausgabe
+
+  while (!Serial)
+  {
+    ; // auf die serielle Schnittstelle warten
+  }
+
+  delay(1500);                    // Zeit, dass sich das Ethernet Shield initialisiert (1500ms)
+  Serial.println("Verbinden..."); // Meldung an den seriellen Monitor
+
+  if (client.connect(server, 1436))
+  {                               // Sobald die Verbindung steht erfolgt die Meldung auf den Monitor
+    Serial.println("Verbunden!"); // Meldung verbunden
+    Serial.println(ip);           // ip Client (PC) auf dem Monitor ausgeben
+    Serial.println(server);       // ip Server (Zusi3) auf dem Monitor ausgeben
+  }
+  else
+  {
+    Serial.println("Keine Verbindung"); // Falls die Verbindung nicht klappt erfolgt die Meldung auf den Monitor
+  }
+
+  // Byte Serien zum Zusi Server schreiben
+  client.write(Anmeldung, sizeof(Anmeldung));
+  client.write(Abfrage, sizeof(Abfrage)); // *** Vorsicht !!! *** Muss der tatsaechlichen Anzahl von Bytes in der Serie "Abfrage" s.o. entsprechen #154/174
+}
+
+void (*resetFunc)(void) = 0; // Reset Funktion war nur für einen Test gedacht, wird nicht benötigt
+
+// Endlosschleife
+void loop() 
+{ //anfrage muss nur einmal im setup verschickt werden und server sendet durchgehend daten,
+// wenn neue informationen vorhanden sind??????
+
+  if (client.available())
+  {
+    /*
+    1:  4 bytes lesen und reagieren in abhängigkeit des gecasteten int-wertes:
+        wert=0: Knoten(ebene)++, 
+                    & 2 weiter bytes auslesen und in entsprechender ebenen-variable speichern
+        wert=-1: Knoten(ebene)-- 
+        sonst:  attribut bestimmten: 2 bytes auslesen
+                anzahl der auszulesenden bytes (nutzdaten) = wert-2
+        dann: ebenen durchlaufen:
+          Ebene >= 1, Variable1: Verbindungsaufbau (0x0001) || Fahrpultdaten (0x0002) nichts machen
+          Ebene >= 2, Variable2: FST? (0x000A) nichts machen
+          Ebene >= 3, Variable3: 0x0022 (NBÜ) nichts machen
+                      Variable3: 0x0064 (SIFA)
+                        Ebene == 3?
+                        ->ausgabe von nutzdaten in abhängigkeit von attribut
+                      Variable: 0x0065 
+                        Ebene>=4?
+                          Ebene == 4 && Variable4: 0x0003?
+                          ->ausgabe von nutzdaten in abhängigkeit von attribut
+
+                          
+      -1:   
+    */
+    dataLng.b[0] = clientForceRead();
+    dataLng.b[1] = clientForceRead();
+    dataLng.b[2] = clientForceRead();
+    dataLng.b[3] = clientForceRead();
+
+    if (dataLng.i == 0)
+    { // BEGINN KNOTEN
+      ebene++;
+      dataGroup.b[0] = clientForceRead();
+      dataGroup.b[1] = clientForceRead();
+      if (ebene == 1)
+      {
+        ebene1Status = dataGroup.i; //VERBINDUNGSAUFBAU oder fahrpult 
+      }
+      else if (ebene == 2)
+      {
+        ebene2Status = dataGroup.i; //FST-DATA ???
+      }
+      else if (ebene == 3)
+      {
+        ebene3Status = dataGroup.i; //NBÜ/SIFA/PZB->(INDUSI, Türsystem)
+      }
+      else if (ebene == 4)
+      {
+        ebene4Status = dataGroup.i; //INDUSI: 500hz,...
+      }
+    }
+    else if (dataLng.i == -1)
+    { // ENDE KNOTEN
+      ebene--;
+
+      if (ebene < 0)
+      { // AUSNAHMEFEHLER: Sollte nicht auftreten, Hilfsweise Arduino neustarten
+        resetFunc();
+      }
+    }
+    else if (dataLng.i == 1)
+    { // AUSNAHMEFEHLER: Sollte nicht auftreten, Hilfsweise Arduino neustarten
+      resetFunc();
+    }
+    else
+    { // ATTRIBUT
+      dataGroup.b[0] = clientForceRead();
+      dataGroup.b[1] = clientForceRead();
+      
+      nutzdata.i = 0; // Löschen der Nutzdaten Variable
+      for (int i = 0; i < dataLng.i - 2; i++)
+      { // Schleife zum Auslesen der Nutzdaten
+        byte b = clientForceRead();
+        if (i < MAX_NUTZDATA)
+        {
+          nutzdata.b[i] = b;
+        }
+      }
+
+      // AUSWERTUNG
+      if ((ebene >= 1) && (ebene1Status == 0x0001))
+      { // VERBINDUNGSAUFBAU
+      }
+      else if ((ebene >= 1) && (ebene1Status == 0x0002))
+      { // FAHRPULT
+        if ((ebene >= 2) && (ebene2Status == 0x000A))
+        { // FST-DATA
+          if ((ebene >= 3) && (ebene3Status == 0x0022)){}// NBÜ-DATA
+
+          else if ((ebene >= 3) && (ebene3Status == 0x0064)){ // SIFA
+            if (ebene == 3)
+            {
+              if (dataGroup.i == 0x0002)
+              { // Status Sifa-Leuchtmelder
+                if (nutzdata.b[0] == 0)
+                {
+                  digitalWrite(26, HIGH); // SIFA Leuchtmelder einschalten
+                }
+                if (nutzdata.b[0] == 1)
+                {
+                  digitalWrite(26, LOW); // SIFA Leuchtmelder ausschalten
+                }
+              }
+              else if (dataGroup.i == 0x0003)
+              { // Status Sifa-Hupe
+                if (nutzdata.b[0] == 2)
+                  Serial.println("SIFA Hupe Zwangsbremsung");
+                if (nutzdata.b[0] == 1)
+                  Serial.println("SIFA Hupe Warnung");
+                if (nutzdata.b[0] == 0)
+                  Serial.println("SIFA Hupe aus");
+              }
+            }
+          }
+          else if ((ebene >= 3) && (ebene3Status == 0x0065)) //PZB
+          { 
+            if ((ebene >= 4) && (ebene4Status == 0x0003))// Indusi-Betriebsdaten
+            { 
+              if (ebene == 4)
+              {
+                if (dataGroup.i == 0x0005)
+                { // Melder 1000 Hz
+                  if (nutzdata.b[0] == 0)
+                  {
+                    digitalWrite(37, HIGH);
+                  }
+                  if (nutzdata.b[0] == 1)
+                  {
+                    digitalWrite(37, LOW);
+                  }
+                }
+                else if (dataGroup.i == 0x0006)
+                { // Melder U
+                  if (nutzdata.b[0] == 0)
+                  {
+                    digitalWrite(27, HIGH);
+                  }
+                  if (nutzdata.b[0] == 1)
+                  {
+                    digitalWrite(27, LOW);
+                  }
+                }
+                else if (dataGroup.i == 0x0007)
+                { // Melder M
+                  if (nutzdata.b[0] == 0)
+                  {
+                    digitalWrite(29, HIGH);
+                  }
+                  if (nutzdata.b[0] == 1)
+                  {
+                    digitalWrite(29, LOW);
+                  }
+                }
+                else if (dataGroup.i == 0x0008)
+                { // Melder O
+                  if (nutzdata.b[0] == 0)
+                  {
+                    digitalWrite(31, HIGH);
+                  }
+                  if (nutzdata.b[0] == 1)
+                  {
+                    digitalWrite(31, LOW);
+                  }
+                }
+                else if (dataGroup.i == 0x000A)
+                { // Melder 500 Hz
+                  if (nutzdata.b[0] == 0)
+                  {
+                    digitalWrite(35, HIGH);
+                  }
+                  if (nutzdata.b[0] == 1)
+                  {
+                    digitalWrite(35, LOW);
+                  }
+                }
+                else if (dataGroup.i == 0x000B)
+                { // Melder Befehl
+                  if (nutzdata.b[0] == 0)
+                  {
+                    digitalWrite(33, HIGH);
+                  }
+                  if (nutzdata.b[0] == 1)
+                  {
+                    digitalWrite(33, LOW);
+                  }
+                  else if (dataGroup.i == 0x0009)
+                  { // PZB-Summer
+                    if (nutzdata.b[0] >= 0)
+                    {
+                      digitalWrite(38, HIGH);
+                    }
+                    if (nutzdata.b[0] == 1)
+                    {
+                      digitalWrite(38, LOW);
+                    }
+                  }
+                }
+              }
+            }
+          }
+            else if ((ebene >= 3) && (ebene3Status == 0x0066)) // Türsystem
+            { 
+              if (dataGroup.i == 0x000A)
+              {
+                if (nutzdata.b[0] == 0)
+                {
+                  digitalWrite(23, LOW);
+                }
+                if (nutzdata.b[0] == 1)
+                {
+                  digitalWrite(23, HIGH);
+                }
+              }
+              // TT LINKS
+
+              else if (dataGroup.i == 0x0008)
+              {
+                Serial.print("Status Melder links: ");
+                Serial.println(nutzdata.b[0]);
+                if (nutzdata.b[0] == 1)
+                {
+
+                  digitalWrite(24, HIGH);
+                }
+                if (nutzdata.b[0] == 0)
+                {
+                  digitalWrite(24, LOW);
+                }
+              }
+
+              // TT RECHTS
+              else if (dataGroup.i == 0x0009)
+              {
+                if (nutzdata.b[0] == 1)
+                {
+                  digitalWrite(25, HIGH);
+                }
+                if (nutzdata.b[0] == 0)
+                {
+                  digitalWrite(25, LOW);
+                }
+              }
+
+              // TT LINKS & RECHTS BLINKEND
+              unsigned long currentMillis = millis();
+              if (nutzdata.b[0] == 2 && currentMillis - previousMillis >= interval)
+              {
+                previousMillis = currentMillis;
+                running = !running;        // toggle running variable
+                digitalWrite(24, running); // indicate via LED
+                digitalWrite(25, running);
+              }
+            }
+            else if (ebene == 2)
+            {
+              if (dataGroup.i == 0x0001)
+              { // Geschwindigkeit Meter/Sekunde
+                byte Geschw = nutzdata.f * 3.6;
+                // Serial.print("A");
+                // Serial.println(Geschw);
+              }
+              else if (dataGroup.i == 0x000A)
+              { // Zugkraft Ist/Achse in Newton
+                byte Zugkraft_ist = nutzdata.f;
+                // Serial.println(Zugkraft_ist);
+              }
+              else if (dataGroup.i == 0x000C)
+              { // Zugkraft Soll/Achse in Newton
+                byte Zugkraft_soll = nutzdata.f;
+                // Serial.println(Zugkraft_soll);
+                switch (dataGroup.i)
+                {
+                case 0x0001: // Geschwindigkeit in m/s
+                  float geschwindigkeit = nutzdata.f * 3.6;
+                  if (geschwindigkeit == 0)
+                    analogWrite(Tacho, 0);
+                  else if (geschwindigkeit <= 10)
+                    analogWrite(Tacho, geschwindigkeit / 10 * 8);
+                  else if (geschwindigkeit <= 20)
+                    analogWrite(Tacho, 8 + (geschwindigkeit - 10) / 10 * 4);
+                  else if (geschwindigkeit <= 30)
+                    analogWrite(Tacho, 12 + (geschwindigkeit - 20) / 10 * 12);
+                  else if (geschwindigkeit <= 40)
+                    analogWrite(Tacho, 24 + (geschwindigkeit - 30) / 10 * 13);
+                  else if (geschwindigkeit <= 80)
+                    analogWrite(Tacho, 37 + (geschwindigkeit - 40) / 10 * 14);
+                  else if (geschwindigkeit <= 90)
+                    analogWrite(Tacho, 93 + (geschwindigkeit - 80) / 10 * 13);
+                  else if (geschwindigkeit <= 100)
+                    analogWrite(Tacho, 106 + (geschwindigkeit - 90) / 10 * 15);
+                  else if (geschwindigkeit <= 130)
+                    analogWrite(Tacho, 121 + (geschwindigkeit - 100) / 10 * 13);
+                  else if (geschwindigkeit <= 140)
+                    analogWrite(Tacho, 160 + (geschwindigkeit - 130) / 10 * 12);
+                  else if (geschwindigkeit <= 145)
+                    analogWrite(Tacho, 172 + (geschwindigkeit - 140) / 10 * 13);
+                  else
+                    analogWrite(Tacho, 177);
+                  break;
+
+                  //           case 0x0002:  {  //Druck HL
+                  //           Serial.println("HL");
+                  //           set_hl(nutzdata.f); //eigene Funktion zum Ansteuern des Schrittmotors
+                  //           break; }
+
+                  //           case 0x0004:  {  //Druck HBL
+                  //           Serial.println("HBL");
+                  //           set_hbl(nutzdata.f); //eigene Funktion zum Ansteuern des Schrittmotors
+                  //           break; }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // wenn der Server getrennt wird, stoppt der Client und gibt seriell eine Meldung ab:
+    if (!client.connected())
+    {
+      Serial.println();
+      Serial.println("Verbindung Gestoppt!");
+      client.stop();
+      // mache nichts:
+      while (true)
+        ;
+      // resetFunc ();
+    }
+  }
+}

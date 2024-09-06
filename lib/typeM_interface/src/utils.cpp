@@ -90,7 +90,7 @@ void toggle_verbose()
 //option 7 for config menu in config_file_utils - store current config in flash (changes by user are temporary) - not working yet!!!!!!!
 //==========================================================================================================================
 
-void commit_config_to_fs(int sim) //overwrite specific data depending on simulator //1: simMetro, 2: lokSim3D
+void commit_config_to_fs(int sim) //overwrite specific data depending on simulator //1: thmSim, 2: lokSim3D
 { 
 
   char *buffer = new char[2]{'\0'};
@@ -149,7 +149,7 @@ void commit_config_to_fs(int sim) //overwrite specific data depending on simulat
             //
             //4. append buffer to file 
             //
-            if(sim == 1) //simmetro
+            if(sim == 1) //thmSim
             {
               int len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", sizeof(uint8_t), sizeof(uint8_t), mcp_list[i].address[t], sizeof(uint8_t), mcp_list[i].address[t], mcp_list[i].address[t],  mcp_list[i].info[t]) + 1;
               buffer = new char[len];
@@ -206,7 +206,7 @@ void choose_sim()
   int option = 0;
    
   USBSerial.print(F("Kehren Sie mit \"C\" zurück zum Menü.\n"));   
-  USBSerial.print(F("Welche Schnittstelle soll nach dem nächsten Neustart geladen werden?\n\n1 -> SimMetro\n2 -> LokSim3D\n"));
+  USBSerial.print(F("Welche Schnittstelle soll nach dem nächsten Neustart geladen werden?\n\n1 -> THM-Simulator\n2 -> LokSim3D\n"));
 
   strcpy(info,  "\nDiese Option steht nicht zur verfügung.\nGeben Sie eine \"1\" oder eine \"2\" ein, oder kehren Sie mit \"C\" zurück zum Menü.\n");
   if (get_integer_with_range_check(&option, 1, 2, info)) return;
@@ -215,14 +215,14 @@ void choose_sim()
 
   if (option == 1) 
   {
-    preferences.putUInt("app_setting", option);
+    preferences.putUInt("app_settings", option);
     
-    USBSerial.print(F("\nSimMetro Schnittstelle wird nach dem nächsten Neustart geladen."));
+    USBSerial.print(F("\nSchnittstelle zu THM-Simulator wird dem nächsten Neustart initialisiert."));
   } 
   else if (option == 2) 
   {
-    preferences.putUInt("app_setting", option);
-    USBSerial.print(F("\nLokSim3D Schnittstelle wird nach dem nächsten Neustart geladen."));
+    preferences.putUInt("app_settings", option);
+    USBSerial.print(F("\nSchnittstelle zu LokSim3D wird dem nächsten Neustart initialisiert."));
   } 
   preferences.end();
 
@@ -349,42 +349,13 @@ void indicate_finished_setup()
 
 
 //======================================================================
-//partition find functions by 
+//
 //======================================================================
 
-// Get the string name of type enum values
-static const char* get_type_str(esp_partition_type_t type)
-{
-    switch(type) {
-        case ESP_PARTITION_TYPE_APP:
-            return "ESP_PARTITION_TYPE_APP";
-        case ESP_PARTITION_TYPE_DATA:
-            return "ESP_PARTITION_TYPE_DATA";
-        default:
-            return "UNKNOWN_PARTITION_TYPE"; // type not used in this example
-    }
-}
-
-// Get the string name of subtype enum values
-static const char* get_subtype_str(esp_partition_subtype_t subtype)
-{
-    switch(subtype) {
-        case ESP_PARTITION_SUBTYPE_DATA_NVS:
-            return "ESP_PARTITION_SUBTYPE_DATA_NVS";
-        case ESP_PARTITION_SUBTYPE_DATA_PHY:
-            return "ESP_PARTITION_SUBTYPE_DATA_PHY";
-        case ESP_PARTITION_SUBTYPE_APP_FACTORY:
-            return "ESP_PARTITION_SUBTYPE_APP_FACTORY";
-        case ESP_PARTITION_SUBTYPE_DATA_FAT:
-            return "ESP_PARTITION_SUBTYPE_DATA_FAT";
-        default:
-            return "UNKNOWN_PARTITION_SUBTYPE"; // subtype not used in this example
-    }
-}
-
 void find_and_print_partitions() {
+  bool found_coredump = false;
 
-  USBSerial.println("\n\n----------------Find partitions---------------\n");
+  USBSerial.println("\n\n----------------Partition---------------\n");
       
   esp_partition_iterator_t it;
   it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
@@ -396,7 +367,7 @@ void find_and_print_partitions() {
       USBSerial.printf("found partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
   }
   esp_partition_iterator_release(it);
-
+  USBSerial.println();
   it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, NULL);
 
   // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired 
@@ -404,9 +375,11 @@ void find_and_print_partitions() {
     for (; it != NULL; it = esp_partition_next(it)) {
       const esp_partition_t *part = esp_partition_get(it);
       USBSerial.printf("found partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
-  }
+      if (strncmp(part->label, "coredump", 8) == 0) found_coredump = true;
+    }
+    if (!found_coredump) ESP.restart();
 
   // Release the partition iterator to release memory allocated for it
   esp_partition_iterator_release(it);
-  USBSerial.println("\n----------------End of partitions---------------\n\n\n\n");
+  USBSerial.println("\n----------------End of Partitions---------------\n\n\n\n");
 }

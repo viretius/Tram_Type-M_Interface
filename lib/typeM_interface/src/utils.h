@@ -2,7 +2,7 @@
 #define UTILS_H
 
 #include "Arduino.h"
-#include <config.h>
+#include <globals.h>
 
 #include <USB.h>
 #include <USBHIDKeyboard.h>
