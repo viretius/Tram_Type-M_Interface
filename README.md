@@ -1,5 +1,11 @@
 # Tram Type-M Interface
 
+
+![Bildbeschreibung]([URL-des-Bildes](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))
+
+*Quelle: [Link zur Bildquelle]([URL-der-Bildquelle](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))*
+
+
 ## Initial Setup using PlatformIO
 
 Follow the steps below to perform a fresh upload to an Arduino/Waveshare Nano ESP32-S3:
