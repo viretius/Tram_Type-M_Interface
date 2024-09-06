@@ -1,9 +1,8 @@
 # Tram Type-M Interface
 
-https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg
-![Bildbeschreibung]([URL-des-Bildes](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))
+![Bildbeschreibung]([URL-des-Bildes](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)
 
-*Quelle: [Link zur Bildquelle]([URL-der-Bildquelle](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))*
+*Quelle: [Link zur Bildquelle]([URL-der-Bildquelle](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)*
 
 
 ## Initial Setup using PlatformIO
