@@ -1,6 +1,6 @@
 # Tram Type-M Interface
 
-![]([URL-des-Bildes](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))
+![Bild]([URL-des-Bildes](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))
 
 *Quelle: [Link zur Bildquelle]([URL-der-Bildquelle](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg))*
 
