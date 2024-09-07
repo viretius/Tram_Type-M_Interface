@@ -89,108 +89,212 @@ void toggle_verbose()
 //==========================================================================================================================
 //option 7 for config menu in config_file_utils - store current config in flash (changes by user are temporary) - not working yet!!!!!!!
 //==========================================================================================================================
+//==========================================================================================================================
+//=======Helper functions for commit_config_to_fs (option 7)================================================================
+
+static void update_mcp_config(char *current_config, int sim, size_t config_size)
+{
+  //temporarily saves a row of the config
+  char *buffer;
+  //story updated config in updated_config -> only overwrite current config file, if nothing went wrong 
+  char *updated_config = new char[config_size]; 
+  memset(&updated_config[0], '\0', config_size);
+  const char *mcp_csvHeader = "i2c;pin;kanal;io;key;adresse;info\n";
+  int len;
+
+  strcpy(updated_config, mcp_csvHeader);
+  //extract values from config file, copy to buffer except "kanal", "adresse" and "key" entry, depending on value of "sim"
+                                  //i2c;pin;kanal;io;key;adresse;info
+  CSV_Parser mcp_parse(current_config, "ucucsucss-" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
+    
+  uint8_t *i2c = (uint8_t*)mcp_parse["i2c"];
+  uint8_t *pin = (uint8_t*)mcp_parse["pin"];
+  char **kanal = (char**)mcp_parse["kanal"]; //tcp: here used for outputs (leds and stuff)
+  uint8_t *io = (uint8_t*)mcp_parse["io"];
+  char **key = (char**)mcp_parse["key"];        //used for inputs (buttons, switches, etc.), but also saved in mcp_list[].address[]
+  char **address = (char**)mcp_parse["adresse"]; //tcp: here used for outputs (leds and stuff)
+    
+  USBSerial.print(F("\n Neue Konfiguration wird erstellt. Bitte warten..."));
+  for (int t = 0; t < mcp_parse.getRowsCount(); t++) //update mcp.txt
+  {
+    //1. determin length of each row in bytes 
+    //2. create buffer with this length
+    //3. fill buffer with data
+    //5. append buffer to file 
+
+    if(sim == 1) //thmSim: copy "key" and "address" from mcp_parse, copy "kanal" from mcp_list
+    {                   //i2c;pin;kanal;io;key;adresse;info
+      char *_kanal = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
+      len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], _kanal, io[t], key[t], address[t],  mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      buffer = new char[len];
+      snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], _kanal, io[t], key[t], address[t],  mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1;
+    }
+    else if(sim == 2) 
+    {                   //i2c;pin;kanal;io;key;adresse;info
+      //store mcp_list[].address[] in "key"entry or in "adresse"-entry, depending on where the entry was stored in the config file
+      if (strlen(key[t]) >= 1) 
+      {
+        char *_key = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
+        len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        buffer = new char[len];
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      }
+      else if (strlen(address[t]) >= 1) 
+      {
+        char *_adr = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
+        len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        buffer = new char[len];
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      }
+      else 
+      {
+        if (VERBOSE) USBSerial.println("Kein \"key\" oder \"adresse\" Eintrag gefunden. Alter Wert wird übernommen.");
+        len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        buffer = new char[len];
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      }
+      //store row
+      strncpy(updated_config, buffer, len);
+      if (VERBOSE) USBSerial.printf("%s\n", buffer); 
+    }
+  }
+  delete[] buffer;
+
+  //overwrite config file
+  USBSerial.println("Alte Konfiguration wird überschrieben. Bitte warten...");
+  clearFile(LittleFS, "/mcp.txt");
+
+  //dont update file at once but row for row, because it could overload the ram which would lead to errors
+  appendFile(LittleFS, "/mcp.txt", mcp_csvHeader);
+  char *row = strtok(updated_config, "\n"); 
+  while (row != NULL) {
+    appendFile(LittleFS, "/mcp.txt", row);
+    row = strtok(NULL, "\n"); //extract next row
+  }
+}
+//==========================================================================================================================
+static void update_pcf_config(char* current_config, int sim, size_t config_size)
+{
+  //temporarily saves a row of the config
+  char *buffer;
+  //story updated config in updated_config -> only overwrite current config file, if nothing went wrong 
+  char *updated_config = new char[config_size]; 
+  memset(&updated_config[0], '\0', config_size);
+  const char *pcf_csvHeader = "i2c;pin;kanal;key;adresse;info\n";
+  int len; //char-count of a row
+
+  strcpy(updated_config, pcf_csvHeader);
+  //extract values from config file, copy to buffer except "kanal", "adresse" and "key" entry, depending on value of "sim"
+  //i2c;pin;kanal;key;adresse;info
+  CSV_Parser pcf_parse(current_config, "ucucsss-" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
+    
+  uint8_t *i2c = (uint8_t*)pcf_parse["i2c"];
+  uint8_t *pin = (uint8_t*)pcf_parse["pin"];
+  char **kanal = (char**)pcf_parse["kanal"]; //tcp: here used for outputs (leds and stuff)
+  char **key = (char**)pcf_parse["key"];        //used for inputs (buttons, switches, etc.), but also saved in mcp_list[].address[]
+  char **address = (char**)pcf_parse["adresse"]; //tcp: here used for outputs (leds and stuff)
+    
+  USBSerial.print(F("\n Neue Konfiguration wird erstellt. Bitte warten..."));
+  for (int t = 0; t < pcf_parse.getRowsCount(); t++) //update mcp.txt
+  {
+    //1. determin length of each row in bytes 
+    //2. create buffer with this length
+    //3. fill buffer with data
+    //5. append buffer to file 
+
+    if(sim == 1) //thmSim: copy "key" and "address" from mcp_parse, copy "kanal" from mcp_list
+    {                   //i2c;pin;kanal;io;key;adresse;info
+      char *_kanal = pcf_list[ i2c[t] - PCF_I2C_BASE_ADDRESS ].address[ pin[t] ];
+      len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], _kanal, key[t], address[t],  pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      buffer = new char[len];
+      snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], _kanal, key[t], address[t],  pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1;
+    }
+    else if(sim == 2) 
+    {                   //i2c;pin;kanal;io;key;adresse;info
+      //store mcp_list[].address[] in "key"entry or in "adresse"-entry, depending on where the entry was stored in the config file
+      if (strlen(key[t]) >= 1) 
+      {
+        char *_key = pcf_list[ i2c[t] - PCF_I2C_BASE_ADDRESS ].address[ pin[t] ];
+        len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], _key, "", pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        buffer = new char[len];
+        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], _key, "", pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      }
+      else if (strlen(address[t]) >= 1) 
+      {
+        char *_adr = pcf_list[ i2c[t] - PCF_I2C_BASE_ADDRESS ].address[ pin[t] ];
+        len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], "", _adr, pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        buffer = new char[len];
+        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], "", _adr, pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      }
+      else 
+      {
+        if (VERBOSE) USBSerial.println("Kein \"key\" oder \"adresse\" Eintrag gefunden. Alter Wert wird übernommen.");
+        len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        buffer = new char[len];
+        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+      }
+      //store row
+      strncpy(updated_config, buffer, len);
+      if (VERBOSE) USBSerial.printf("%s\n", buffer);   
+    }
+  }
+  delete[] buffer;
+
+  //overwrite config file
+  USBSerial.println("Alte Konfiguration wird überschrieben. Bitte warten...");
+  clearFile(LittleFS, "/pcf.txt");
+  
+  //dont update file at once but row for row, because it could overload the ram which would lead to errors
+  appendFile(LittleFS, "/pcf.txt", pcf_csvHeader);
+  char *row = strtok(updated_config, "\n"); 
+  while (row != NULL) {
+    appendFile(LittleFS, "/pcf.txt", row);
+    row = strtok(NULL, "\n"); //extract next row
+  }
+}
 
 void commit_config_to_fs(int sim) //overwrite specific data depending on simulator //1: thmSim, 2: lokSim3D
 { 
+  if (sim != 1 || sim != 2) {
+    USBSerial.printf("%i ist keine Option für \"commit_config_to_fs(int sim)\" ", sim);
+    return;
+  }
 
-  char *buffer = new char[2]{'\0'};
+  char buffer[2] = {'\0', '\0'};
   USBSerial.print(F("\"S\" - Um die Änderungen im Flash zu sichern und die alte Konfiguration zu überschreiben, geben Sie ein \"S\" ein."));
   USBSerial.print(F("\nKehren Sie mit \"C\" zurück zum Menü."));   
   
-  while(USBSerial.available()<1){vTaskDelay(1);}
-  USBSerial.readBytesUntil('\n', buffer, 2);
+  while(USBSerial.available() < 1) { vTaskDelay(10); }
+  USBSerial.readBytesUntil('\n', buffer, 1);
   USBSerial.println(buffer);
 
   if (buffer[0] == 'C') return;
 
   else if (buffer[0]  == 'S')
   {
-    int i, t;
-    int mcp_count = 0;
-    int pcf_count = 0;
-    char info[250];        //info for user, if input didnt fit to request, static array, because there is enough memory, but memory allocation costs cpu cycles
-    char *buffer;      //buffer for user-input
-    const char *mcp_csvHeader = "i2c;pin;kanal;io;key;addresse;info\n";
-    const char *pcf_csvHeader = "i2c;pin;kanal;key;addresse;info\n";
-
-    for (i = 0; i < MAX_IC_COUNT; i++) 
-    {
-      if (mcp_list[i + MCP_I2C_BASE_ADDRESS].enabled) mcp_count++;
-      if (pcf_list[i + PCF_I2C_BASE_ADDRESS].enabled) pcf_count++;
-    }
-
     size_t mcp_buf_size = getFilesize(LittleFS, "/mcp.txt");
     size_t pcf_buf_size = getFilesize(LittleFS, "/pcf.txt");
 
-    char *current_mcp_config = new char[mcp_buf_size];    //17 + mcp_count * 16 * 10 + 1]; //23: length of header, ic_count * 16 pins * 8chars/pin (i2cadr(2) ";" pin "; &address ";" io "\n") + null-terminator
-    char *current_pcf_config = new char[pcf_buf_size];            //14 + pcf_count * 5 * 9 + 1]; 
+    char *current_mcp_config = new char[mcp_buf_size];    
+    char *current_pcf_config = new char[pcf_buf_size];            
 
     readFile(LittleFS, "/mcp.txt", current_mcp_config, mcp_buf_size);
     readFile(LittleFS, "/pcf.txt", current_pcf_config, pcf_buf_size);
-
-    USBSerial.print(F("\nKonfigurationen werden überschrieben. Bitte warten..."));
-
-    clearFile(LittleFS, "/mcp.txt");
-    clearFile(LittleFS, "/pcf.txt");
+    
+    //=========================================================
     
     USBSerial.print(F("\nAktualisiere mcp.txt..."));
-    appendFile(LittleFS, "/mcp.txt", mcp_csvHeader);
-
-    for (i = 0; i < MAX_IC_COUNT; i++) {
-      if (mcp_list[i].enabled) 
-      { 
-        for (t = 0; t < 16; t++) 
-        {
-          //if user enables a new ic that has never been active before, every address will be set to == "-1"
-          //user might only change some of them and not every single one
-            //1. determin length of row in csv file in bytes
-            //2. create buffer with this length
-            //3. fill buffer with data from mcp_list
-            //
-            //4. append buffer to file 
-            //
-            if(sim == 1) //thmSim
-            {
-              int len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", sizeof(uint8_t), sizeof(uint8_t), mcp_list[i].address[t], sizeof(uint8_t), mcp_list[i].address[t], mcp_list[i].address[t],  mcp_list[i].info[t]) + 1;
-              buffer = new char[len];
-              snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", mcp_list[i].i2c, t, mcp_list[i].address[t], (CHECK_BIT(mcp_list[i].portMode, t)) ? 1:0, mcp_list[i].address[t], mcp_list[i].address[t], mcp_list[i].info[t]);
-            
-            }
-            else if(sim == 2) {}
-            else{
-              USBSerial.println("speicher fehlgeschlagen. ");
-              return;
-            }
-            appendFile(LittleFS, "/mcp.txt", buffer);
-            //USBSerial.printf("%s\n", buffer); //debugging purposes
-        }
-      }
-    }
+    update_mcp_config(current_mcp_config, sim, mcp_buf_size);
+  
     USBSerial.print(F("\nAktualisiere pcf.txt..."));
-    appendFile(LittleFS, "/pcf.txt", pcf_csvHeader);
+    update_pcf_config(current_pcf_config, sim, pcf_buf_size);
 
-    for (i = 0; i < MAX_IC_COUNT; i++) {
-      if (pcf_list[i].enabled) 
-      { 
-        for (t = 0; t < 5; t++) 
-        {
-          
-            int len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", sizeof(uint8_t), sizeof(uint8_t), pcf_list[i].address[t], pcf_list[i].address[t], pcf_list[i].address[t], pcf_list[i].info[t]) + 1; //+1 for null-terminator
-            buffer = new char[len];
-            snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", pcf_list[i].i2c, t, pcf_list[i].address[t], pcf_list[i].address[t], pcf_list[i].address[t], pcf_list[i].info[t]);
-            appendFile(LittleFS, "/pcf.txt", buffer);
-            //USBSerial.printf("%s\n", buffer); 
-          
-        }
-      }
-    }
+    //=========================================================
 
-    USBSerial.print(F("\nKonfigurationen erfolgreich gespeichert."));
-    
+    USBSerial.print(F("\nAktualisierung erfolgreich abgeschlossen."));
     delete[] current_mcp_config;
     delete[] current_pcf_config;
   }
-  delete[] buffer;
 
 }
 //==========================================================================================================================

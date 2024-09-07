@@ -90,7 +90,7 @@ bool load_config()
     {      
       //evalute if pin is input or output by checking if key is set or not instead of checking io
       //Store the key value in mcp_list's address array 
-      if (sizeof(key[t]) >= 1) //no key value -> output
+      if (strlen(key[t]) >= 1) //no key value -> output
       {
         //pin is a input
         bitWrite(mcp_list[i2c[t] - MCP_I2C_BASE_ADDRESS].portMode, pin[t], 1); 
@@ -652,8 +652,9 @@ void serial_config_menu()
             toggle_verbose();
             break;
         case 3:
-            USBSerial.println("Diese Funktion wurde noch nicht implementiert.");
-            //commit_config_to_fs(2); //2: loksim3D
+            USBSerial.println("FUNKTION IST UNGETESTET. NUTZUNG AUF EIGENE GEFAHR!");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            commit_config_to_fs(2); //number indicates, which sim_interface is active 
             break;
         case 4:
             break;

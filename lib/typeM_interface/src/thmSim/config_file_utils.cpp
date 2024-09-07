@@ -74,7 +74,7 @@ bool load_config()
   uint8_t *i2c = (uint8_t*)mcp_parse["i2c"];
   uint8_t *pin = (uint8_t*)mcp_parse["pin"];
   char **address = (char**)mcp_parse["kanal"]; //tcp: here used for outputs (leds and stuff)
-  uint8_t *io = (uint8_t*)mcp_parse["io"];      //theoreticly not needed -> rows with key are inputs, rows with tcp-addresses are outputs
+  uint8_t *io = (uint8_t*)mcp_parse["io"];      
   char **info = (char**)mcp_parse["info"];
 
   for (t = 0; t < mcp_parse.getRowsCount(); t++) 
@@ -389,8 +389,9 @@ void serial_config_menu()
             toggle_verbose();
             break;
         case 3:
-            USBSerial.println("Diese Funktion wurde noch nicht implementiert.");
-            //commit_config_to_fs(1);
+            USBSerial.println("FUNKTION IST UNGETESTET. NUTZUNG AUF EIGENE GEFAHR!");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            commit_config_to_fs(1);
             break;
         case 4://do nothing to escape the menu
             break;

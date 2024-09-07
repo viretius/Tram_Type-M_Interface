@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef GLOBALS_H
+#define GLOBALS_H
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -46,7 +46,7 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 
 
 //============================================================
-//defines for requests to zusi/loksim3d-server
+//defines for requests to zusi/loksim3d-server 
 //============================================================
 
 #define GESCHWINDIGKEIT 0x0001

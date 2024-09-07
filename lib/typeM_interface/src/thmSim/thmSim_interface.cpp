@@ -115,9 +115,7 @@ void handshake()
   vTaskResume(Task5);
   vTaskDelay(pdMS_TO_TICKS(10));
   vTaskResume(Task1);
-  vTaskDelay(pdMS_TO_TICKS(10));
   vTaskResume(Task2);
-  vTaskDelay(pdMS_TO_TICKS(10));
   vTaskResume(Task3);
 }
 
@@ -378,10 +376,11 @@ void output_task (void * pvParameters)
 
       for (i = 0; i < MAX_IC_COUNT; i++) 
       {
-        if(!mcp_list[i].enabled) continue;//i2c adress not in use
+        if(!mcp_list[i].enabled) continue; //i2c adress not in use
+        
         for (t = 0; t < 16; t++) 
         {
-          if(strncmp(mcp_list[i].address[t], address, 2) != 0) continue;
+          if(strncmp(mcp_list[i].address[t], address, 2) != 0) continue; //continue until finding the address
           
           if (CHECK_BIT(mcp_list[i].portMode, t)) //pin was set as input!
           { 
@@ -389,7 +388,7 @@ void output_task (void * pvParameters)
             goto ret; //break both for-loops;
           }
 
-          if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(15)) == pdTRUE) 
+          if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(15)) == pdTRUE)   //set output
           { 
             if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  PIN %i an IC mit i2c-Adresse %i wird geschaltet\n", t, i+MCP_I2C_BASE_ADDRESS);
             mcp_list[i].mcp.digitalWrite(t, atoi(data)); 
@@ -467,24 +466,23 @@ void rx_task(void *pvParameters)
             USBSerial.readBytes(cmd_buffer, 4);
             if (strncmp(cmd_buffer, "INI1", 4) == 0)
             {
-              if (VERBOSE) USBSerial.println("INI1:\n");
+              if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "INI1\n", pdMS_TO_TICKS(15));
               handshake();
-              if (VERBOSE) USBSerial.println("rdy");
             }
+            else if (VERBOSE) xQueueSend(serial_tx_verbose_queue, &cmd_buffer, pdMS_TO_TICKS(15));
           }
-          else if (VERBOSE) USBSerial.println(cmd_buffer);     
         }
         else if (cmd_buffer[0] == 'X')
         {
           // Wait for the full command (assumed length 9 bytes)
           if (USBSerial.available() >= 9)
           {
-            USBSerial.readBytes(cmd_buffer, CMD_BUFFER_SIZE-1);
-            if (cmd_buffer[0] == 'X' && cmd_buffer[8] == 'Y')
+            USBSerial.readBytes(cmd_buffer, CMD_BUFFER_SIZE-1);//CMD_BUFFER_SIZE = 9 chars + '\n' = 10
+            if (cmd_buffer[8] == 'Y')
             {
               xQueueSend(serial_rx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(2));
             }
-            while(USBSerial.available()) USBSerial.read();
+            else if (VERBOSE) xQueueSend(serial_tx_verbose_queue, &cmd_buffer, pdMS_TO_TICKS(15));
           }
         } else 
         {
@@ -496,7 +494,8 @@ void rx_task(void *pvParameters)
             if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[Serial_rx_task]\n  Fehlerhaftes Datentelegramm: %s\n", cmd_buffer);           
           }
         }
-        memset(cmd_buffer, '\0', CMD_BUFFER_SIZE); // clear cmd buffer
+        while(USBSerial.available()) USBSerial.read(); //clear hardware buffer
+        memset(cmd_buffer, '\0', CMD_BUFFER_SIZE); 
       }
     }
 }

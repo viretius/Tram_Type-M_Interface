@@ -5,8 +5,7 @@
 #include <utils.h>
 #include <thmSim/thmSim_interface.h> //import namespace thmSim_interface
 
-namespace thmSim_config{
-    
+namespace thmSim_config { 
     bool load_config();
     void serial_config_menu();
 };
