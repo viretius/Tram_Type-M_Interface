@@ -127,7 +127,7 @@ static void update_mcp_config(char *current_config, int sim, size_t config_size)
       char *_kanal = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
       len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], _kanal, io[t], key[t], address[t],  mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
       buffer = new char[len];
-      snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], _kanal, io[t], key[t], address[t],  mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1;
+      snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], _kanal, io[t], key[t], address[t],  mcp_list[ i2c[t] ].info[ pin[t] ] );
     }
     else if(sim == 2) 
     {                   //i2c;pin;kanal;io;key;adresse;info
@@ -137,21 +137,21 @@ static void update_mcp_config(char *current_config, int sim, size_t config_size)
         char *_key = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ); 
       }
       else if (strlen(address[t]) >= 1) 
       {
         char *_adr = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ); 
       }
       else 
       {
         if (VERBOSE) USBSerial.println("Kein \"key\" oder \"adresse\" Eintrag gefunden. Alter Wert wird übernommen.");
         len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] );
       }
       //store row
       strncpy(updated_config, buffer, len);
@@ -207,7 +207,7 @@ static void update_pcf_config(char* current_config, int sim, size_t config_size)
       char *_kanal = pcf_list[ i2c[t] - PCF_I2C_BASE_ADDRESS ].address[ pin[t] ];
       len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], _kanal, key[t], address[t],  pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
       buffer = new char[len];
-      snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], _kanal, key[t], address[t],  pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1;
+      snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], _kanal, key[t], address[t],  pcf_list[ i2c[t] ].info[ pin[t] ] );
     }
     else if(sim == 2) 
     {                   //i2c;pin;kanal;io;key;adresse;info
@@ -217,21 +217,21 @@ static void update_pcf_config(char* current_config, int sim, size_t config_size)
         char *_key = pcf_list[ i2c[t] - PCF_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], _key, "", pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], _key, "", pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], _key, "", pcf_list[ i2c[t] ].info[ pin[t] ] );
       }
       else if (strlen(address[t]) >= 1) 
       {
         char *_adr = pcf_list[ i2c[t] - PCF_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], "", _adr, pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], "", _adr, pcf_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], "", _adr, pcf_list[ i2c[t] ].info[ pin[t] ] );
       }
       else 
       {
         if (VERBOSE) USBSerial.println("Kein \"key\" oder \"adresse\" Eintrag gefunden. Alter Wert wird übernommen.");
         len = snprintf(NULL, 0, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
+        snprintf(buffer, len, "%u;%u;%s;%s;%s;%s\n", i2c[t], pin[t], kanal[t], key[t], address[t], mcp_list[ i2c[t] ].info[ pin[t] ] );
       }
       //store row
       strncpy(updated_config, buffer, len);
