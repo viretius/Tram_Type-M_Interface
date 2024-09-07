@@ -12,19 +12,16 @@ Interface with the purpose of operating Trains with the "THM-Simulator" and "Lok
 
 Follow the steps below to perform a fresh upload to an Arduino/Waveshare Nano ESP32-S3:
 
-1. **Build and Flash Partition Binary**
+1. **Build Partition and Firmware Binary**
 
-   Flash the `partitions.bin` file to address `0x8000` using the following command:
+2. **Flash the `partitions.bin` file to address `0x8000` using the following command:**
 
    ```esptool.py --port $UPLOAD_PORT --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partitions.bin```
 
-2. **Upload File System**
+3. **Upload `firmware.bin` to address `0x10000` (factory)**
+   
+4. **Upload `littlefs.bin` to address `0x190000` (SPIFFS)**
 
-   Upload `littlefs.bin` to address `0x190000` (SPIFFS).
-
-3. **Upload Firmware**
-
-   Upload `firmware.bin` to address `0x10000` (factory).
 
 ## To-Do
 - [ ] make use of the default ESP32-S3 partition (for some reason, the default "factory" part is to small)
