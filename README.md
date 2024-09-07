@@ -1,5 +1,7 @@
 # Tram Type-M Interface
 
+Interface with the purpose of operating the THM train simulator and LokSim3D using the control panel of this tram:
+
 ![Bild](https://www.strassenbahn-online.de/Betriebshof/Duewag/M/M_top.jpg)
 
 <sub>
