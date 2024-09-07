@@ -255,7 +255,7 @@ static void update_pcf_config(char* current_config, int sim, size_t config_size)
 
 void commit_config_to_fs(int sim) //overwrite specific data depending on simulator //1: thmSim, 2: lokSim3D
 { 
-  if (sim != 1 || sim != 2) {
+  if (sim != 1 && sim != 2) { 
     USBSerial.printf("%i ist keine Option für \"commit_config_to_fs(int sim)\" ", sim);
     return;
   }
