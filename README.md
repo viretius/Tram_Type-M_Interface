@@ -27,6 +27,6 @@ Follow the steps below to perform a fresh upload to an Arduino/Waveshare Nano ES
    Upload `firmware.bin` to address `0x10000` (factory).
 
 ## To-Do
-- [ ] make use of the default partition (for some reason, the default "factory" part is to small)
+- [ ] make use of the default ESP32-S3 partition (for some reason, the default "factory" part is to small)
 - [ ] Evaluating the data packets for LokSim3D and setting the outputs accordingly
 - [ ] Store Config in Header-Files instead of using Filesystem
