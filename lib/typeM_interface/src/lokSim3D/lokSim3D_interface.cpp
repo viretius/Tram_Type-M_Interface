@@ -154,7 +154,7 @@ void press_and_release_key(uint8_t ic_address, uint8_t pin)
     if (strcmp(token, "ctrl") == 0) (*keyReport).modifiers |= KEY_LEFT_CTRL; // "|=" to combine multiple modifier keys instead of overwriting
     else if (strcmp(token, "shift") == 0) (*keyReport).modifiers |= KEY_LEFT_SHIFT;
     else if (strcmp(token, "alt") == 0) (*keyReport).modifiers |= KEY_LEFT_ALT;
-    else if (strcmp(token, "gui") == 0) (*keyReport).modifiers |= KEY_LEFT_GUI;
+    else if (strcmp(token, "win") == 0) (*keyReport).modifiers |= KEY_LEFT_GUI;
     else if (strcmp(token, "arrow_left") == 0) (*keyReport).modifiers |= KEY_LEFT_ARROW;
     else if (strcmp(token, "arrow_right") == 0) (*keyReport).modifiers |= KEY_RIGHT_ARROW;
     else if (strcmp(token, "arrow_up") == 0) (*keyReport).modifiers |= KEY_UP_ARROW;
@@ -604,12 +604,14 @@ void tx_task (void * pvParameters)
     uint8_t reserved;
     uint8_t keys[6];
   } KeyReport;*/
+
+
   KeyReport keyReport;
 
   char buffer[VERBOSE_BUFFER_SIZE]; //only one buffer -> overwrite content after USBSerial.print
 
   for(;;)
-  {
+  { 
     vTaskDelay(5);
 
     if (xQueueReceive(keyboard_tx_queue, &keyReport, 0) == pdTRUE)    Keyboard.sendReport(&keyReport);

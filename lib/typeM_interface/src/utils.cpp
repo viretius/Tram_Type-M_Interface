@@ -137,14 +137,14 @@ static void update_mcp_config(char *current_config, int sim, size_t config_size)
         char *_key = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ); 
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] );
       }
       else if (strlen(address[t]) >= 1) 
       {
         char *_adr = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
         buffer = new char[len];
-        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] ); 
+        snprintf(buffer, len, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], "", _adr, mcp_list[ i2c[t] ].info[ pin[t] ] );
       }
       else 
       {
@@ -255,7 +255,7 @@ static void update_pcf_config(char* current_config, int sim, size_t config_size)
 
 void commit_config_to_fs(int sim) //overwrite specific data depending on simulator //1: thmSim, 2: lokSim3D
 { 
-  if (sim != 1 && sim != 2) { 
+  if (sim != 1 && sim != 2) {
     USBSerial.printf("%i ist keine Option für \"commit_config_to_fs(int sim)\" ", sim);
     return;
   }
