@@ -297,13 +297,11 @@ void commit_config_to_fs(int sim) //overwrite specific data depending on simulat
   }
 
 }
-//==========================================================================================================================
-//let user enter a number with specific bounds and max 16 digits
-//==========================================================================================================================
 
 //==========================================================================================================================
 //choose which interface should be loaded after reboot
 //==========================================================================================================================
+
 void choose_sim() 
 {
   char info[250] = {'\0'};
@@ -335,7 +333,7 @@ void choose_sim()
 
 
 //==========================================================================================================================
-//
+//let user enter a number with specific bounds and check if input is valid, user can exit to menu by entering "C"
 //==========================================================================================================================
 
 bool get_integer_with_range_check (int *var, uint lower_bound, uint upper_bound, char *info) //returns true (exit to menu) if user entered "C"
@@ -393,71 +391,10 @@ bool get_integer_with_range_check (int *var, uint lower_bound, uint upper_bound,
 }
 
 //======================================================================
-//optic feedback for user, to let him know, that the setup is finished 
-//======================================================================
-
-void indicate_finished_setup() 
-{
-  int i, j, t;
-  
-  //turn on all outputs
-  for (i = 0; i < MAX_IC_COUNT; i++) 
-  {
-    if (!mcp_list[i].enabled) continue;
-    for (t = 0; t < 16; t++) 
-    {
-      if (CHECK_BIT(mcp_list[i].portMode, t)) continue; //only set ouputs 
-      mcp_list[i].mcp.digitalWrite(t, 1);
-    }
-  }
-
-  for(i = 0; i <= 255; i++) 
-  {
-    for (t = 0; t < MAX_IC_COUNT; t++) 
-    {
-      if (!pcf_list[t].enabled) continue;
-      pcf_list[t].pcf.analogWrite(i);
-      delay(2);
-    }
-  }
-  delay(300);
-
-  //turn off outputs
-  for (i = 0; i < MAX_IC_COUNT; i++) 
-  {
-    if (!mcp_list[i].enabled) continue;
-    for (t = 0; t < 16; t++) 
-    {
-      if (CHECK_BIT(mcp_list[i].portMode, t)) continue; //only set ouputs 
-      mcp_list[i].mcp.digitalWrite(t, 0);
-    }
-  }
-  
-  for(i = 255; i >= 0; i--) 
-  {
-    for (t = 0; t < MAX_IC_COUNT; t++) 
-    {
-      if (!pcf_list[t].enabled) continue;
-      pcf_list[t].pcf.analogWrite(i);
-    }
-  }  
-
-  // Ensure the analog output is set to 0
-  for (t = 0; t < MAX_IC_COUNT; t++) 
-  {
-    if (!pcf_list[t].enabled) continue;
-    pcf_list[t].pcf.analogWrite(0);
-  }
-
-}
-
-
-//======================================================================
 //
 //======================================================================
 
 void find_and_print_partitions() {
-  bool found_coredump = false;
 
   USBSerial.println("\n\n----------------Partition---------------\n");
       
@@ -479,9 +416,7 @@ void find_and_print_partitions() {
     for (; it != NULL; it = esp_partition_next(it)) {
       const esp_partition_t *part = esp_partition_get(it);
       USBSerial.printf("found partition '%s' at offset 0x%x with size 0x%x\n", part->label, part->address, part->size);
-      if (strncmp(part->label, "coredump", 8) == 0) found_coredump = true;
     }
-    if (!found_coredump) ESP.restart();
 
   // Release the partition iterator to release memory allocated for it
   esp_partition_iterator_release(it);

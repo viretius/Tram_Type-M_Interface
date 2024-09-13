@@ -5,10 +5,11 @@ void init_typeM_interface() {
     
     //USB.onEvent(USB_Event_Callback); //for debugging purposes - USBSerial rx functionality wont work if this line is uncommented
     //USBSerial.onEvent(USB_Event_Callback); 
-
-    USBSerial.begin();
+    //HWSerial.setHwFlowCtrlMode(UART_HW_FLOWCTRL_DISABLE, 64);
+    //HWSerial.begin(115200);
+    USBSerial.begin();  
     USB.begin();
-    while(!USBSerial){;};
+    while(!USBSerial);
     find_and_print_partitions();
     
     //====================================================================================

@@ -1,23 +1,4 @@
-/*
-cvs files: 
-  
-  mcp:
-  i2c;pin;kanal;io;key;adresse;info
-     
-  pcf: 
-  i2c;pin;key;kanal;adresse;info
-
-    -> address "tp" for combined throttle 
-*/
-
 #include "lokSim3D/config_file_utils.h"
-
-/*
-*functions for file/data management
-*openFile() functions return a File object. 
-*This object supports all the functions of Stream, 
-*so you can use readBytes, findUntil, parseInt, println, and all other Stream methods
-*/ 
 
 using namespace lokSim3D_interface;
 
@@ -339,9 +320,9 @@ static void process_IPInput()
   while (USBSerial.available()) USBSerial.read();
   USBSerial.print(F("\nGeben Sie jetzt die neue IPV4 Adresse im gängigen Format ein oder kehren sie mit \"C\" zurück zum Menü.\n"));
 
-  //1: read input
+  //1: read input 
   while(!USBSerial.available()) {vTaskDelay(1);} 
-  if (USBSerial.peek() == 'C') return;     
+  if (USBSerial.peek() == 'C') return;     //return to menu if user enters "C"
 
   int bytesRead = 0;
   while (USBSerial.available()) 
@@ -392,7 +373,7 @@ static void process_IPInput()
   memset(&buffer[0], '\0', 3); 
   USBSerial.readBytesUntil('\n', buffer, 1); 
   USBSerial.printf("\n%s", buffer);
-  if (strcmp(buffer, "j") == 0 || strcmp(buffer, "J") == 0)  
+  if (strcmp(buffer, "j") == 0 || strcmp(buffer, "J") == 0)  //user confirmed input -> save to preferences
   {
     preferences.begin("lokSim3D_net", false);
     preferences.putUInt("ip1", ip[0]);
@@ -404,7 +385,7 @@ static void process_IPInput()
   }
   else {
     delete[] buffer;
-    process_IPInput();
+    process_IPInput(); //user denied input -> repeat, user can enter "c" to return to menu
   }
   delete[] buffer;
 
@@ -478,7 +459,7 @@ static void process_MACInput()
 
 //==========================================================================================================================
 //let user change keyboard shortcut / tcp address of an input / output
-//adjustments to be made for loksim3d ( )
+//not working yet for loksim3d
 //==========================================================================================================================
 static void opt_1() {
                   
@@ -646,7 +627,10 @@ void serial_config_menu()
     switch (option)
     {
         case 1:
-            opt_1();
+            USBSerial.println("FUNKTION IST WURDE FÜR LOKSIM3D NOCH NICHT IMPLEMENTIERT");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            run_config_task = 1;
+            //opt_1();
             break;
         case 2:
             toggle_verbose();
@@ -656,7 +640,7 @@ void serial_config_menu()
             vTaskDelay(pdMS_TO_TICKS(1000));
             commit_config_to_fs(2); //number indicates, which sim_interface is active 
             break;
-        case 4:
+        case 4: //exit
             break;
         case 5:
             ESP.restart();
@@ -676,11 +660,11 @@ void serial_config_menu()
             break;
     }
 
-    if (!run_config_task) {
+    if (!run_config_task) 
+    {
       USBSerial.print(F("\nKonfigurationsmenü beendet.\nUm in das Konfigurationsmenü zu gelangen bitte \"M\" eingeben."));
       USBSerial.print(F("\n\n-------------------------------------------------"));
       USBSerial.print(F("-------------------------------------------------\n\n\n\n\n\n\n\n"));
-      //esc();
     }
 }
 

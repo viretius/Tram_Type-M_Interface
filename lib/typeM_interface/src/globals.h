@@ -21,12 +21,6 @@
 //various global variables and definitions
 //============================================================
 
-/*
-Arduino ESP32S3 Nano: 
-static constexpr uint8_t LED_RED = GPIO 46; (B0)
-static constexpr uint8_t LED_GREEN = GPIO 0; (B1)
-static constexpr uint8_t LED_BLUE = GPIO 45; 
-*/
 
 #define MAX_IC_COUNT 8
 
@@ -49,7 +43,7 @@ static constexpr uint8_t LED_BLUE = GPIO 45;
 //defines for requests to zusi/loksim3d-server 
 //============================================================
 
-#define GESCHWINDIGKEIT 0x0001
+#define GESCHWINDIGKEIT 1
 #define SPANNUNG 8
 #define AFB_SOLL_GESCHWINDIGKEIT 18
 #define MG_BREMSE 41
@@ -128,7 +122,6 @@ extern SemaphoreHandle_t i2c_mutex;
 #define USBSerial Serial
 #else
 #define HWSerial Serial
-extern USBCDC USBSerial;
 #endif
 
 //============================================================

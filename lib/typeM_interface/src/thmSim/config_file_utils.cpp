@@ -1,18 +1,3 @@
-/*
-cvs files: 
-  
-  mcp:
-  i2c;pin;kanal;io;key;addresse;info ->key&addresse not used for thmSim
-
-    -> kanal&keyn "ac" for acceleration indicator button
-    -> kanal&key "dc" for deceleration indicator button
-     
-  pcf: 
-  i2c;pin;key;kanal;adresse;info
-
-    -> address "ct" for combined throttle 
-*/
-
 #include <thmSim/config_file_utils.h>
 
 using namespace thmSim_interface;

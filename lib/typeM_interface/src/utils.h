@@ -9,10 +9,10 @@
 
 //==============================================================================================
 //funktion like sprintf(). prints a formatted string to a queue, instead of a c-String variable
-//used for verbose output and 
+//used for verbose output
 //==============================================================================================
 
-template <size_t count>
+template <size_t count> //template to allow dynamic buffer size
 void queue_printf(QueueHandle_t queue, const char *format, ...) {
     
     static char buffer[count] = {'\0'}; 
@@ -48,21 +48,16 @@ bool get_integer_with_range_check(int *var, uint lower_bound, uint upper_bound, 
 //functions called by serial_config_menu in config_file_utils 
 //==============================================================================================
 
-void toggle_verbose();//option 6 to toggle verbose output
+void toggle_verbose();
 
-void commit_config_to_fs(int sim);//option 7 for config menu in config_file_utils
+void commit_config_to_fs(int sim);
 
-void choose_sim();//choose which interface should be loaded after reboot
-
-//==============================================================================================
-//let user know that setup is finished by blinking all leds - not working anymore
-//==============================================================================================
-
-void indicate_finished_setup();
+void choose_sim();  //choose which interface should be loaded after next restart
 
 //==============================================================================================
-//print partitions to serial monitor (called at setup)
+//print partitions to serial monitor 
 //==============================================================================================
+
 void find_and_print_partitions();
 
 #endif

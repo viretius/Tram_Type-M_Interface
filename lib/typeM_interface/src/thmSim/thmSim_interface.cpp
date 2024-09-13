@@ -1,9 +1,3 @@
-
-
-//================================================================================================================
-//================================================================================================================
-
-
 #include <thmSim/thmSim_interface.h>
 
 using namespace thmSim_config;
@@ -110,21 +104,15 @@ void INI()
 }
 
 
-
+//========================================================================================================
+//pwm output for buzzer not used yet
 //========================================================================================================
 
-/*
-*pwm output for buzzer
-*/
-
-static void toggle_buzzer(uint8_t pin, float frequency) 
-{
-
+static void toggle_buzzer(uint8_t pin, float frequency) { //frequency of 0 turns off the buzzer
+  ledcSetup(0, frequency, 12); 
+  ledcAttachPin(pin, 0);
+  ledcWriteTone(0, frequency);
 }
-
-//========================================================================================================
-//========================================================================================================
-
 
 //================================================================================================================
 //polls every connected MCP IC and checks for changes of the input pin states. Interrupt not used, because only the i2c bus is connected for compatibility reasons
@@ -436,7 +424,6 @@ void rx_task(void *pvParameters)
 {
     char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'};
     char verbose_buffer[VERBOSE_BUFFER_SIZE] = {'\0'};
-    uint8_t t, i; // local for-loop counter
     size_t rx_count = 0;
 
     for(;;)
@@ -455,12 +442,13 @@ void rx_task(void *pvParameters)
           if (USBSerial.available() >= 4)
           {
             USBSerial.readBytes(cmd_buffer, 4);
-            if (strncmp(cmd_buffer, "INI1", 4) == 0)
-            {
-              if (VERBOSE) xQueueSend(serial_tx_verbose_queue, "INI1\n", pdMS_TO_TICKS(15));
-              handshake();
-            }
-            else if (VERBOSE) xQueueSend(serial_tx_verbose_queue, &cmd_buffer, pdMS_TO_TICKS(15));
+            if (strncmp(cmd_buffer, "INI1", 4) == 0) INI();
+          } 
+          else if (VERBOSE) 
+          {
+            size_t availableBytes = USBSerial.available();
+            USBSerial.readBytes(cmd_buffer, availableBytes);
+            queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[Serial_rx_task]\n  Fehlerhaftes Datentelegramm: %s\n", cmd_buffer);
           }
         }
         else if (cmd_buffer[0] == 'X')
@@ -473,7 +461,12 @@ void rx_task(void *pvParameters)
             {
               xQueueSend(serial_rx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(2));
             }
-            else if (VERBOSE) xQueueSend(serial_tx_verbose_queue, &cmd_buffer, pdMS_TO_TICKS(15));
+            else if (VERBOSE) 
+            {
+              size_t availableBytes = USBSerial.available();
+              USBSerial.readBytes(cmd_buffer, availableBytes);
+              queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[Serial_rx_task]\n  Fehlerhaftes Datentelegramm: %s\n", cmd_buffer);
+            }
           }
         } else 
         {
@@ -528,6 +521,7 @@ void config_task (void * pvParameters)
     //suspend tasks to prevent data corruption
     vTaskSuspend(Task1);      //digital input task
     vTaskSuspend(Task2);      //analog input task
+    vTaskSuspend(Task3);      //output task
     vTaskSuspend(Task4);      //USBSerial rx task     
     vTaskSuspend(Task5);      //USBSerial tx task
 
@@ -537,6 +531,7 @@ void config_task (void * pvParameters)
     {
       vTaskResume(Task1);
       vTaskResume(Task2);
+      vTaskResume(Task3);
       vTaskResume(Task4);
       vTaskResume(Task5);
       vTaskSuspend(NULL);
@@ -582,8 +577,6 @@ void init()
     
     xTaskCreate(config_task, "Task6", 8000, NULL, 2, &Task6);
     vTaskSuspend(Task6); //dont open the config menu
-
-    //indicate_finished_setup();
     
     USBSerial.printf(("\nTasks erfolgreich gestartet.\nUm in das Konfigurationsmenü zu gelangen, \"M\" eingeben."));
     

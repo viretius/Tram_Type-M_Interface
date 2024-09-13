@@ -17,7 +17,7 @@ namespace lokSim3D_interface {
     static WiFiClient client;
 
     static QueueHandle_t tcp_rx_queue;
-    static QueueHandle_t keyboard_tx_queue;
+    static QueueHandle_t keyreport_tx_queue;
 
 };
 
