@@ -25,6 +25,6 @@ Follow the steps below to perform a fresh upload to an Arduino/Waveshare Nano ES
 
 ## To-Do
 - [ ] make USBCDC Class work without dtr-command (data terminal ready) !
-- [ ] make use of the default ESP32-S3 partition (for some reason, the default "factory" part is to small)
+- [ ] make use of the default Nano ESP32-S3 partition (for some reason, the default "factory" part is to small)
 - [ ] Evaluating the data packets from LokSim3D-Server and setting the outputs accordingly
 - [ ] Store Config in Header-Files instead of using Filesystem
