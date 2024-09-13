@@ -14,37 +14,32 @@ namespace thmSim_interface {
 //print every input status
 //========================================================================================================
 
-void handshake() 
+void INI() 
 {
-  vTaskSuspend(Task5);
-  vTaskSuspend(Task1);
-  vTaskSuspend(Task2);
-  vTaskSuspend(Task3);
-  vTaskDelay(pdMS_TO_TICKS(25)); //delay after task-suspension required?
+  xSemaphoreTake(i2c_mutex, portMAX_DELAY);
 
-  int t, i;
+  int t = 0, i = 0;
   uint16_t port = 0b0;    //GPIO register  
   uint8_t reading = 0;    //analog value
   bool button_state = false;
-  char data[5];                         //4 chars + nullterminator
-  char address[3];
+  char data[5] = {'\0','\0','\0','\0','\0'};                         //4 chars + nullterminator
+  char address[3] = {'\0','\0','\0'};
 
-  if (VERBOSE) USBSerial.println("MCP ICs:");
+  if (VERBOSE) {USBSerial.println("MCP ICs:");}
   for (i = 0; i < MAX_IC_COUNT; i++) 
   { 
-    if(!mcp_list[i].enabled) continue; //IC with this i2c address is "deactivated"  
-    vTaskDelay(pdMS_TO_TICKS(50));
-
+    if(!mcp_list[i].enabled) {continue;} //IC with this i2c address is "deactivated"  
     port = mcp_list[i].mcp.read();  //read GPIO-Register
-
+    if (VERBOSE) {printBinary(port);}
+    
     for (t = 0; t < 16; t++) 
-    {
-      if (strncmp(mcp_list[i].address[t], "-1", 2) == 0) continue; //pin not used
-      if (!CHECK_BIT(mcp_list[i].portMode, t)) continue;   //pin set as output
-      if (VERBOSE) USBSerial.println("Eingang gefinden");
+    { 
+      if (strncmp(mcp_list[i].address[t], "-1", 2) == 0) {continue;} //pin not used
+      if (!CHECK_BIT(mcp_list[i].portMode, t)) {continue;}   //pin set as output
+      if (VERBOSE) {USBSerial.println("Eingang gefunden");}
 
       button_state = CHECK_BIT(port, t);                //
-      if (VERBOSE) USBSerial.println("aktualisiere last_reading...");
+      if (VERBOSE) {USBSerial.println("Aktualisiere last_reading...");}
       bitWrite(mcp_list[i].last_reading, t, button_state); //update last_reading 
       
       if( (i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS) && (t == acceleration_button[1]) ) 
@@ -59,29 +54,28 @@ void handshake()
       }
            
       memset(&data[0], '\0', 5);
-      button_state ? strcpy(data, "0000") : strcpy(data, "0001") ;   //invert, because input-pullups pull inputs high, button-press pulls them low
-      strncpy(address, mcp_list[i].address[t], 2);        
+      button_state ? strcpy(data, "0000") : strcpy(data, "0001");   //invert, because input-pullups pull inputs high, button-press pulls them low
+      strcpy(address, mcp_list[i].address[t]);        
       
       USBSerial.printf("XU%02s%04sY", address, data); 
       USBSerial.flush(); 
     }
   }
 
-  if (VERBOSE) USBSerial.println("PCF ICs:");
-  vTaskDelay(pdMS_TO_TICKS(10));
+  if (VERBOSE) {USBSerial.println("PCF ICs:");}
 
   for (i = 0; i < MAX_IC_COUNT; i++) 
-  {
+  {       
+    if(!pcf_list[i].enabled) {continue;} //IC with this i2c address is "deactivated"
+
     for (t = 0; t < 4; t++)
     {
-      if(!pcf_list[i].enabled) continue; //IC with this i2c address is "deactivated"
-      if (strncmp(pcf_list[i].address[t], "-1", 2) == 0) continue;
+      if (strncmp(pcf_list[i].address[t], "-1", 2) == 0) {continue;}
       reading = pcf_list[i].pcf.analogRead(t);
       pcf_list[i].last_reading[t] = reading;
       
       char address[3] = {0,0,0};
       memset(&address[0], '\0', 3); 
-      vTaskDelay(pdMS_TO_TICKS(10));
 
       if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1])
       { 
@@ -102,7 +96,7 @@ void handshake()
       else //some analog input 
       {
         strncat(address, pcf_list[i].address[t], 2); //just any other analog input
-        if(VERBOSE) USBSerial.printf("\nWert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading);
+        if(VERBOSE) {USBSerial.printf("\nWert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading);}
       }
           
       USBSerial.printf("XV%02s%04sY", pcf_list[i].address[t], data);
@@ -111,13 +105,10 @@ void handshake()
 
   }
 
-  USBSerial.println("INI2");
-  vTaskResume(Task5);
-  vTaskDelay(pdMS_TO_TICKS(10));
-  vTaskResume(Task1);
-  vTaskResume(Task2);
-  vTaskResume(Task3);
+  USBSerial.print("INI2");
+  xSemaphoreGive(i2c_mutex);
 }
+
 
 
 //========================================================================================================
