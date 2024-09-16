@@ -457,10 +457,14 @@ void rx_task(void *pvParameters)
       
         else if (cmd_buffer[0] == 'I')
         {
+          //sometimes it happens, that the esp reads the serial buffer faster, than there are bytes transmitted
+          //(especially with a slow rate of 9600baud)
+          //-> read until hardware-buffer ist empty
+          //if desired number of bytes couldnt be read, the while-loop will run again
           while (Serial.available()) 
-          {
+          {                                                     //INI1 -> 4 bytes
             bytesRead += Serial.readBytes(cmd_buffer + bytesRead, 4 - bytesRead);  
-            if (bytesRead > 3 || cmd_buffer[0] == '\0') break;
+            if (bytesRead > 3 || cmd_buffer[0] == '\0') break; 
             vTaskDelay(1); 
           }
           if (strncmp(cmd_buffer, "INI1", 4) == 0) ini();
@@ -472,7 +476,7 @@ void rx_task(void *pvParameters)
         else if (cmd_buffer[0] == 'X')
         {
           while (Serial.available()) 
-          {
+          {                                                 //XUxxxxxxY -> 9 Bytes
             bytesRead += Serial.readBytes(cmd_buffer + bytesRead, 9 - bytesRead);  
             if (bytesRead > 8 || cmd_buffer[0] == '\0') break;
             vTaskDelay(1); 
