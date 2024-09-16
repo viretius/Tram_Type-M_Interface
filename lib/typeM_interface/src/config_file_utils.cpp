@@ -1313,27 +1313,26 @@ static void commit_config_to_fs(int sim) //overwrite specific data depending on 
   Serial.print(F("\"S\" - Um die Änderungen im Flash zu sichern und die alte Konfiguration zu überschreiben, geben Sie ein \"S\" ein."));
   Serial.print(F("\nKehren Sie mit \"C\" zurück zum Menü."));   
   
-  while(Serial.available() < 1) { vTaskDelay(10); }
-  Serial.readBytesUntil('\n', buffer, 1);
-  Serial.println(buffer);
+  while(Serial.available() < 1) { vTaskDelay(1); }
+  
 
-  if (buffer[0] == 'C') return;
+  if (Serial.peek() == 'C') return;
 
-  else if (buffer[0]  == 'S')
+  else if (Serial.peek() == 'S')
   {
-    size_t mcp_buf_size = getFilesize(LittleFS, "/mcp.txt");
+    size_t mcp_buf_size = getFilesize(LittleFS, "/mcp.txt"); 
     size_t pcf_buf_size = getFilesize(LittleFS, "/pcf.txt");
 
-    char *current_mcp_config = new char[mcp_buf_size];    
+    char *current_mcp_config = new char[mcp_buf_size];    //allocate memory for the current config
     char *current_pcf_config = new char[pcf_buf_size];            
 
-    readFile(LittleFS, "/mcp.txt", current_mcp_config, mcp_buf_size);
+    readFile(LittleFS, "/mcp.txt", current_mcp_config, mcp_buf_size); //read config into allocated memory
     readFile(LittleFS, "/pcf.txt", current_pcf_config, pcf_buf_size);
     
     //=========================================================
     
     Serial.print(F("\nAktualisiere mcp.txt..."));
-    update_mcp_config(current_mcp_config, sim, mcp_buf_size);
+    update_mcp_config(current_mcp_config, sim, mcp_buf_size); 
   
     Serial.print(F("\nAktualisiere pcf.txt..."));
     update_pcf_config(current_pcf_config, sim, pcf_buf_size);
@@ -1349,25 +1348,27 @@ static void commit_config_to_fs(int sim) //overwrite specific data depending on 
 //==========================================================================================================================
 static void update_mcp_config(char *current_config, int sim, size_t config_size)
 {
-  //temporarily saves a row of the config
+  //temporarily saves a single row of the config
   char *buffer;
   //story updated config in updated_config -> only overwrite current config file, if nothing went wrong 
   char *updated_config = new char[config_size]; 
   memset(&updated_config[0], '\0', config_size);
+  
   const char *mcp_csvHeader = "i2c;pin;kanal;io;key;adresse;info\n";
   int len;
 
   strcpy(updated_config, mcp_csvHeader);
-  //extract values from config file, copy to buffer except "kanal", "adresse" and "key" entry, depending on value of "sim"
+  //extract values from config file and copy every entro to buffer, 
+  //except "kanal", "adresse" and "key" entry, depending on value of "sim"
                                   //i2c;pin;kanal;io;key;adresse;info
   CSV_Parser mcp_parse(current_config, "ucucsucss-" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
     
   uint8_t *i2c = (uint8_t*)mcp_parse["i2c"];
   uint8_t *pin = (uint8_t*)mcp_parse["pin"];
-  char **kanal = (char**)mcp_parse["kanal"]; //tcp: here used for outputs (leds and stuff)
+  char **kanal = (char**)mcp_parse["kanal"]; 
   uint8_t *io = (uint8_t*)mcp_parse["io"];
-  char **key = (char**)mcp_parse["key"];        //used for inputs (buttons, switches, etc.), but also saved in mcp_list[].address[]
-  char **address = (char**)mcp_parse["adresse"]; //tcp: here used for outputs (leds and stuff)
+  char **key = (char**)mcp_parse["key"];        
+  char **address = (char**)mcp_parse["adresse"]; 
     
   Serial.print(F("\n Neue Konfiguration wird erstellt. Bitte warten..."));
   for (int t = 0; t < mcp_parse.getRowsCount(); t++) //update mcp.txt
@@ -1375,9 +1376,9 @@ static void update_mcp_config(char *current_config, int sim, size_t config_size)
     //1. determin length of each row in bytes 
     //2. create buffer with this length
     //3. fill buffer with data
-    //5. append buffer to file 
+    //5. append buffer to updated_config variable 
 
-    if(sim == 1) //thmSim: copy "key" and "address" from mcp_parse, copy "kanal" from mcp_list
+    if(sim == 1) //thmSim: copy "key" and "address" from mcp_parse (current config), copy "kanal" from mcp_list
     {                   //i2c;pin;kanal;io;key;adresse;info
       char *_kanal = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
       len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], _kanal, io[t], key[t], address[t],  mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
@@ -1386,8 +1387,9 @@ static void update_mcp_config(char *current_config, int sim, size_t config_size)
     }
     else if(sim == 2) 
     {                   //i2c;pin;kanal;io;key;adresse;info
-      //store mcp_list[].address[] in "key"entry or in "adresse"-entry, depending on where the entry was stored in the config file
-      if (strlen(key[t]) >= 1) 
+      //store mcp_list[].address[] in "key"entry or in "adresse"-entry, 
+      //depending on where the entry was stored in the config file
+      if (strlen(key[t]) >= 1) //entry was originaly a key
       {
         char *_key = mcp_list[ i2c[t] - MCP_I2C_BASE_ADDRESS ].address[ pin[t] ];
         len = snprintf(NULL, 0, "%u;%u;%s;%u;%s;%s;%s\n", i2c[t], pin[t], kanal[t], io[t], _key, "", mcp_list[ i2c[t] ].info[ pin[t] ] ) + 1; //+1 for null-terminator
@@ -1419,7 +1421,7 @@ static void update_mcp_config(char *current_config, int sim, size_t config_size)
   Serial.println("Alte Konfiguration wird überschrieben. Bitte warten...");
   clearFile(LittleFS, "/mcp.txt");
 
-  //dont update file at once but row for row, because it could overload the ram which would lead to errors
+  //dont update file at once but row for row
   appendFile(LittleFS, "/mcp.txt", mcp_csvHeader);
   char *row = strtok(updated_config, "\n"); 
   while (row != NULL) {
