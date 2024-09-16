@@ -29,7 +29,7 @@
 #define DEBOUNCE_DELAY_MS 80         //debounce delay for digital inputs
 
 #define CMD_BUFFER_SIZE 10          // "X"(start) "U"(D/A) "XX"(address) "XXXX"(data) "Y"(end) "\0" 
-#define VERBOSE_BUFFER_SIZE 75         
+#define VERBOSE_BUFFER_SIZE 180    //number if characters         
 
 #define MCP_I2C_BASE_ADDRESS 32     //0x20
 #define PCF_I2C_BASE_ADDRESS 72     //0x48
@@ -107,8 +107,8 @@ void queue_printf(QueueHandle_t queue, const char *format, ...) {
     va_end(args);
     
     // Send buffer contents to the queue
-    if (xQueueSend(queue, &buffer, pdMS_TO_TICKS(10)) != pdTRUE) {
-        Serial.println("Queue full\n");
+    if (xQueueSend(queue, &buffer, pdMS_TO_TICKS(100)) != pdTRUE) {
+        Serial.println("\n\nQueue full\n");
         Serial.print(buffer);
     }
 }

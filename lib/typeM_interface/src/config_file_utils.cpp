@@ -80,7 +80,7 @@ bool load_config()
   CSV_Parser mcp_parse(mcp_buf, "ucucsuc--s" /*uc: unsigned char, s: string, -: unused*/, /*has header*/true, /*custom delimiter*/';');    
   
   Serial.println();
-  mcp_parse.print();
+  //mcp_parse.print();
   
   uint8_t *i2c = (uint8_t*)mcp_parse["i2c"];
   uint8_t *pin = (uint8_t*)mcp_parse["pin"];
@@ -165,7 +165,7 @@ bool load_config()
   CSV_Parser pcf_parse(pcf_buf, "ucucs--s" /*uc: unsigned char, s: string*/, /*has header*/true, /*custom delimiter*/';');
  
   Serial.println();
-  pcf_parse.print();
+  //pcf_parse.print();
 
   i2c = (uint8_t*)pcf_parse["i2c"];
   pin = (uint8_t*)pcf_parse["pin"];
@@ -195,7 +195,10 @@ bool load_config()
       combined_throttle_ic[0] = i2c[t]; 
       combined_throttle_ic[1] = pin[t];
       //print out the address of the combined throttle, at this point, these are already set
-      Serial.printf("Kombihebel gefunden. Kanalnummern: %i, %i", combined_throttle_ic[0], combined_throttle_ic[1]);
+      Serial.printf("Kombihebel gefunden. Kanalnummern: %s, %s\n", 
+                    mcp_list[ acceleration_button[0] - MCP_I2C_BASE_ADDRESS ].address[ acceleration_button[1] ],
+                    mcp_list[ deceleration_button[0] - MCP_I2C_BASE_ADDRESS ].address[ deceleration_button[1] ]
+                    );
     } 
     else {    
         strcpy(pcf_list[i2c[t] - PCF_I2C_BASE_ADDRESS].address[pin[t]], address[t]);  
@@ -232,18 +235,21 @@ bool load_config()
     if (!mcp_list[i].mcp.init(mcp_list[i].i2c)) {
       Serial.printf("\nMCP23017 mit der Adresse 0x%i konnte nicht initialisiert werden.", mcp_list[i].i2c);
       mcp_list[i].enabled = false;
+      continue;
     }
 
     mcp_list[i].mcp.portMode(MCP23017Port::A, mcp_list[i].portMode & 0xFF); //input_pullups enabled by default, portA: LSB
     mcp_list[i].mcp.portMode(MCP23017Port::B, (mcp_list[i].portMode >> 8) & 0xFF); //portB: MSB
     mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_A, 0x00);
     mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_B, 0x00);  //Reset ports
-    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_A, 0x00);    
-    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_B, 0x00);  //If a bit is set, the corresponding GPIO register bit will reflect the inverted value on the pin                                                               
+    //invert pins, because input_pullups are enabled:
+    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_A, 0xFF);    
+    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_B, 0xFF);  
   
     mcp_list[i].last_reading = mcp_list[i].mcp.read(); //read the current state of the pins
+
     
-    //==============================================================
+    //=============================================================
     //PCF ICs
     //==============================================================
 
@@ -257,6 +263,7 @@ bool load_config()
     if (!pcf_list[i].pcf.begin(pcf_list[i].i2c)) {
       Serial.printf("\n\nPCF8591 mit der Adresse 0x%x konnte nicht initialisiert werden.", pcf_list[i].i2c);
       pcf_list[i].enabled = false;
+      continue;
     } else {
       pcf_list[i].pcf.enableDAC(true);
       pcf_list[i].pcf.analogWrite(0);
@@ -265,6 +272,12 @@ bool load_config()
       }
     }
   } 
+
+  acceleration_button_status = mcp_list[acceleration_button[0]-MCP_I2C_BASE_ADDRESS].mcp.digitalRead(acceleration_button[1]);
+  deceleration_button_status = mcp_list[deceleration_button[0]-MCP_I2C_BASE_ADDRESS].mcp.digitalRead(deceleration_button[1]); //button is active low
+  
+  Serial.printf("\nac status: %u", acceleration_button_status);
+  Serial.printf("dc status: %u", deceleration_button_status);
 
   delete[] pcf_buf;
   delete[] mcp_buf; 
@@ -678,9 +691,10 @@ bool load_config()
     mcp_list[i].mcp.portMode(MCP23017Port::B, (mcp_list[i].portMode >> 8) & 0xFF); //portB: MSB
     mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_A, 0x00);
     mcp_list[i].mcp.writeRegister(MCP23017Register::GPIO_B, 0x00);  //Reset ports
-    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_A, 0x00);    
-    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_B, 0x00);  //If a bit is set, the corresponding GPIO register bit will reflect the inverted value on the pin                                                               
- 
+    //invert pins, because input_pullups are enabled:
+    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_A, 0x01);    
+    mcp_list[i].mcp.writeRegister(MCP23017Register::IPOL_B, 0x01); 
+
     mcp_list[i].last_reading = mcp_list[i].mcp.read(); //read the current state of the pins
     //=======================================================
     //PCF ICs
