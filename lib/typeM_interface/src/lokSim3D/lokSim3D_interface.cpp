@@ -437,8 +437,8 @@ void output_task(void * pvParameters)
     {
       if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[output task]\n  TCP Datenpaket empfangen: %s\n", payload.message);
 
-      //first two bytes are headers (indicate if a value changed), 5 bytes for each command
-      //first byte is the command, second byte is the value
+      //first two bytes are headers (indicate if a value changed) -> 2+ / 3+ for each command/data-index
+      //5 bytes for each command, first 2 bytes is the command, last 3 bytes represent the value
       //commands are defined in lokSim3D_interface.h
       for (i = 0; i < payload.count; i++) 
       {
