@@ -382,7 +382,7 @@ void output_task (void * pvParameters)
             continue; //maybe there is a output with the same address?
           }
 
-          if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(30)) == pdTRUE)   //pin with this address was found, try to take the i2c_mutex
+          if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)) == pdTRUE)   //pin with this address was found, try to take the i2c_mutex
           { 
             if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  PIN %i an IC mit i2c-Adresse %i wird geschaltet\n", t, i+MCP_I2C_BASE_ADDRESS);
             mcp_list[i].mcp.digitalWrite(t, atoi(data)); //set output
@@ -417,7 +417,7 @@ void output_task (void * pvParameters)
         if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Setze analog ausgang mit Wert: %u\n", value);
 
         value = map(value, 0, 255, 0, 30);
-        if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) { 
+        if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)) == pdTRUE) { 
           pcf_list[i].pcf.analogWrite(value);
           xSemaphoreGive(i2c_mutex);
         } 
