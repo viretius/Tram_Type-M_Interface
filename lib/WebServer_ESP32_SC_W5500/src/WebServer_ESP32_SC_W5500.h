@@ -24,8 +24,9 @@
 
 #ifndef WEBSERVER_ESP32_SC_W5500_H
 #define WEBSERVER_ESP32_SC_W5500_H
-#define DEBUG_ETHERNET_WEBSERVER_PORT       Serial
-
+#ifndef DEBUG_ETHERNET_WEBSERVER_PORT
+#define DEBUG_ETHERNET_WEBSERVER_PORT Serial
+#endif
 //////////////////////////////////////////////////////////////
 
 #if ( ( defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 2) ) && ( ARDUINO_ESP32_GIT_VER != 0x46d5afb1 ) )
