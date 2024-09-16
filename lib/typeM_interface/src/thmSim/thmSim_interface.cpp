@@ -562,7 +562,8 @@ void config_task (void * pvParameters)
 //=============================================================
 void init_interface() 
 {
-
+    Serial.setTimeout(200); //wait 200ms for new data to arrive, before assuming, that input is complete
+  
     Wire.begin();       //initialize i2c bus
     if (!load_config()) return; //load config from files
     
