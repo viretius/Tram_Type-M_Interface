@@ -15,9 +15,9 @@ void ini()
   int t = 0, i = 0;
   uint16_t port = 0b0;    //GPIO register  
   uint8_t reading = 0;    //analog value
-  bool button_state = false;
-  char data[5] = {'\0','\0','\0','\0','\0'};                         //4 chars + nullterminator
-  char address[3] = {'\0','\0','\0'};
+  uint8_t button_state = false;
+  char data[5];;                         //4 chars + nullterminator
+  char address[3];
 
   if (VERBOSE) {Serial.println("MCP ICs:");}
   for (i = 0; i < MAX_IC_COUNT; i++) 
@@ -30,24 +30,25 @@ void ini()
     { 
       if (strncmp(mcp_list[i].address[t], "-1", 2) == 0) {continue;} //pin not used
       if (!CHECK_BIT(mcp_list[i].portMode, t)) {continue;}   //pin set as output
-      if (VERBOSE) {Serial.println("Eingang gefunden");}
 
       button_state = CHECK_BIT(port, t);                //
-      if (VERBOSE) {Serial.println("Aktualisiere last_reading...");}
       bitWrite(mcp_list[i].last_reading, t, button_state); //update last_reading 
       
       if( (i == acceleration_button[0] - MCP_I2C_BASE_ADDRESS) && (t == acceleration_button[1]) ) 
       {
-        acceleration_button_status = button_state;
+        acceleration_button_status = button_state; 
+        if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[INI]\n  Beschleunigen\n  Status: %s\n", button_state? "1":"0");
         continue; 
       }
       if( (i == deceleration_button[0] - MCP_I2C_BASE_ADDRESS) && (t == deceleration_button[1]) )
       {
-        deceleration_button_status = button_state;
+        deceleration_button_status = !(button_state);
+        if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[INI]\n  Bremsen\n  Status: %s\n", button_state? "1":"0");
         continue;  
       }
            
       memset(&data[0], '\0', 5);
+      memset(&address[0], '\0', 3);
       button_state ? strcpy(data, "0000") : strcpy(data, "0001");   //invert, because input-pullups pull inputs high, button-press pulls them low
       strcpy(address, mcp_list[i].address[t]);        
       
@@ -63,34 +64,46 @@ void ini()
     if(!pcf_list[i].enabled) {continue;} //IC with this i2c address is "deactivated"
 
     for (t = 0; t < 4; t++)
-    {
-      if (strncmp(pcf_list[i].address[t], "-1", 2) == 0) {continue;}
+    {  
+      if (pcf_list[i].address[t] == nullptr || strncmp(pcf_list[i].address[t], "-1", 2) == 0) {
+          continue;
+      }   
+      memset(&data[0], '\0', 5);
+      memset(&address[0], '\0', 3);   
+
       reading = pcf_list[i].pcf.analogRead(t);
+
       pcf_list[i].last_reading[t] = reading;
-      
-      char address[3] = {0,0,0};
-      memset(&address[0], '\0', 3); 
+
+      sprintf(data, "%04X", reading);    //convert dec to hex
 
       if ((i + PCF_I2C_BASE_ADDRESS) == combined_throttle_ic[0] && t == combined_throttle_ic[1])
       { 
         if (acceleration_button_status) 
         {
-          strcat( address, mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
+          Serial.printf("XV%02s%04sY", mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]], data); 
+          if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[INI]\n  Beschleunigen\n  Kanal: %s\n", address);
+          Serial.printf("XV%02s%04sY", mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]], "0"); 
+          continue;
         }
         else if (deceleration_button_status) 
         {
-          strcat( address, mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+          Serial.printf("XV%02s%04sY", mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]], data); 
+          if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[INI]\n  Bremsen\n  Kanal: %s\n", address);
+          Serial.printf("XV%02s%04sY", mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]], "0"); 
+          continue;
         }
-        else {
-          reading = 0;
+        else { 
+          Serial.printf("XV%02s%04sY", mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]], "0"); 
+          Serial.flush(); 
+          Serial.printf("XV%02s%04sY", mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]], "0"); 
+          continue;
         }
-        if (VERBOSE) Serial.printf("  Wert an Kombi-Hebel: %u\n", reading); 
-        vTaskDelay(pdMS_TO_TICKS(10));           
       }
       else //some analog input 
       {
         strncat(address, pcf_list[i].address[t], 2); //just any other analog input
-        if(VERBOSE) {Serial.printf("\nWert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading);}
+        if(VERBOSE) {Serial.printf("\nWert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, data);}
       }
           
       Serial.printf("XV%02s%04sY", pcf_list[i].address[t], data);
@@ -174,32 +187,32 @@ void digital_input_task (void * pvParameters)
         */
         if( (i == (acceleration_button[0] - MCP_I2C_BASE_ADDRESS)) && (t == acceleration_button[1]) ) 
         {
+          acceleration_button_status = !(CHECK_BIT(readingAB, acceleration_button[1]) == 0); //ac-button is active high
           if (VERBOSE) 
           {
             snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
-              "  ac-Pin: %c%d\n  I2C-Adresse (DEC): %d\n  Datentelegram: %s\n",
+              "  ac-Pin: %c%d\n  I2C-Adresse (DEC): %d\n  Tasterstatus: %u\n",
               (t > 7) ? 'B' : 'A', (t > 7) ? t - 8 : t,
-              i + MCP_I2C_BASE_ADDRESS,
-              cmd_buffer
+              acceleration_button[0],
+              acceleration_button_status
             );
             xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(15));
           }
-          acceleration_button_status = CHECK_BIT(readingAB, acceleration_button[1]) == 0;
           continue; 
         }
         if( (i == (deceleration_button[0] - MCP_I2C_BASE_ADDRESS)) && (t == deceleration_button[1]) )
         {
+          deceleration_button_status = !(CHECK_BIT(readingAB, deceleration_button[1]) == 0); //dec-button is active low
           if (VERBOSE) 
           {
             snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
-              "  dc-Pin: %c%d\n  I2C-Adresse (DEC): %d\n  Datentelegram: %s\n",
+              "  dc-Pin: %c%d\n  I2C-Adresse (DEC): %d\n  Tasterstatus: %u\n",
               (t > 7) ? 'B' : 'A', (t > 7) ? t - 8 : t,
-              i + MCP_I2C_BASE_ADDRESS,
-              cmd_buffer
+              deceleration_button[0],
+              deceleration_button_status
             );
             xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(15));
           }
-          deceleration_button_status = CHECK_BIT(readingAB, deceleration_button[1]) == 0;
           continue;     
         }
         //check wether the pin changed from 0 to 1 or 1 to 0 and store according char to "data" variable
@@ -273,24 +286,27 @@ void analog_input_task (void * pvParameters)
           { 
             if (acceleration_button_status) 
             {
-              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Beschleunigen.\n");
               sprintf( address, "%02s", mcp_list[acceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[acceleration_button[1]] );
+              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Beschleunigen\n  Kanal: %s\n", address);
+
             }
             else if (deceleration_button_status) 
             {
-              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Bremsen.\n");
               sprintf( address, "%02s", mcp_list[deceleration_button[0] - MCP_I2C_BASE_ADDRESS].address[deceleration_button[1]] );
+              if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Bremsen\n  Kanal: %s\n", address);
             }
             else {
               reading[t] = 0; //no button is pressed, set value to 0 to be on the safe side
+              //dont overwrite address
               if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Mittelstellung.\n");
+
             }
             if (VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "  Wert an Kombi-Hebel: %u\n", reading[t]);            
           }
             
           else //value of some analog input has changed
           {
-            sprintf(address, "%02s", pcf_list[i].address[t]); //just any other analog input
+            snprintf(address, 2, pcf_list[i].address[t]); //just any other analog input
             if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[analog input]\n  Wert an Pin %i von PCF-IC mit Adresse %i: %u\n", t, i+72, reading[t]);
           }
           
@@ -298,16 +314,18 @@ void analog_input_task (void * pvParameters)
           snprintf(cmd_buffer, CMD_BUFFER_SIZE, "XV%02s%04sY", address, data);
 
           //put command-string into the queue    
-          if (!VERBOSE) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(1)); 
-          else {
+          if (!VERBOSE) xQueueSend(serial_tx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(5)); 
+          else 
+          {
             snprintf(verbose_buffer, VERBOSE_BUFFER_SIZE,
               "  Pin: A%d\n  I2C-Adresse (DEC): %d\n  Datentelegram: %s\n",
               t,
               i + PCF_I2C_BASE_ADDRESS,
               cmd_buffer
             );
-            xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(20));
-          }                                           
+            xQueueSend(serial_tx_verbose_queue, &verbose_buffer, pdMS_TO_TICKS(80));
+          } 
+                                              
         }
       }
     }
@@ -361,7 +379,7 @@ void output_task (void * pvParameters)
           if (CHECK_BIT(mcp_list[i].portMode, t)) //pin was set as input!
           { 
             if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Pin %i ist als Eingang konfiguriert.\n", t);
-            goto ret; //break both for-loops;
+            continue; //maybe there is a output with the same address?
           }
 
           if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(30)) == pdTRUE)   //pin with this address was found, try to take the i2c_mutex
@@ -389,15 +407,16 @@ void output_task (void * pvParameters)
       buffer_ptr += 2;                   //remove those first two chars
       strncpy(data, buffer_ptr, 4);      //store remaining four chars in the data char-array
 
-      if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Kanal: %s  Wert: %s \n", address, data);
+      if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Kanal: %s  Wert: %s ", address, data);
 
       for (i = 0; i < MAX_IC_COUNT; i++) 
       {
         if(!pcf_list[i].enabled) continue; //i2c adress not in use
         if(strcmp(pcf_list[i].address[t], address) != 0) continue; //continue until finding the address
-        
-        sscanf(data, "%04x", &value); //convert hex to dec
-        
+        value = strtol(data, NULL, 16);  // Hex-Wert in Dezimalwert umwandeln
+        if(VERBOSE) queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n  Setze analog ausgang mit Wert: %u\n", value);
+
+        value = map(value, 0, 255, 0, 30);
         if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE) { 
           pcf_list[i].pcf.analogWrite(value);
           xSemaphoreGive(i2c_mutex);
@@ -421,6 +440,8 @@ void rx_task(void *pvParameters)
 {
     char cmd_buffer[CMD_BUFFER_SIZE] = {'\0'};
     char verbose_buffer[VERBOSE_BUFFER_SIZE] = {'\0'};
+    int bytesRead;
+
 
     for(;;)
     {
@@ -428,42 +449,44 @@ void rx_task(void *pvParameters)
 
       if (Serial.available() > 0) // hw rx buffer holds at least one char
       {
-        cmd_buffer[0] = Serial.peek(); // peek first char
+        bytesRead = 0;
+        memset(&cmd_buffer[0], '\0', CMD_BUFFER_SIZE);
+        cmd_buffer[0] = Serial.peek();
 
         if (cmd_buffer[0] == 'M' || cmd_buffer[0] == 'm') vTaskResume(config_task_handle);
       
         else if (cmd_buffer[0] == 'I')
         {
-          // Wait for the full "INI1" command (fixed length 4 bytes)
-          if (Serial.available() >= 4)
+          while (Serial.available()) 
           {
-            Serial.readBytes(cmd_buffer, 4);
-            if (strncmp(cmd_buffer, "INI1", 4) == 0) ini();
-          } 
+            bytesRead += Serial.readBytes(cmd_buffer + bytesRead, 4 - bytesRead);  
+            if (bytesRead > 3 || cmd_buffer[0] == '\0') break;
+            vTaskDelay(1); 
+          }
+          if (strncmp(cmd_buffer, "INI1", 4) == 0) ini();
           else if (VERBOSE) //command is not complete
           {
-            size_t availableBytes = Serial.available();
-            Serial.readBytes(cmd_buffer, availableBytes);
             queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[Serial_rx_task]\n  Fehlerhaftes Datentelegramm: %s\n", cmd_buffer);
           }
         }
         else if (cmd_buffer[0] == 'X')
         {
-          // Waitfor at least 9 bytes to be available in the serial buffer 
-          if (Serial.available() >= 9)
-          { //read 9 bytes
-            Serial.readBytes(cmd_buffer, CMD_BUFFER_SIZE-1);//CMD_BUFFER_SIZE = 9 chars + '\0' = 10
-            if (cmd_buffer[8] == 'Y')
-            {
-              xQueueSend(serial_rx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(2));
-            }
-            else if (VERBOSE) //command in the wrong format
-            {
-              Serial.readBytes(cmd_buffer, CMD_BUFFER_SIZE-1);
-              queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[Serial_rx_task]\n  Fehlerhaftes Datentelegramm: %s\n", cmd_buffer);
-            }
+          while (Serial.available()) 
+          {
+            bytesRead += Serial.readBytes(cmd_buffer + bytesRead, 9 - bytesRead);  
+            if (bytesRead > 8 || cmd_buffer[0] == '\0') break;
+            vTaskDelay(1); 
           }
-        } else 
+          if (cmd_buffer[8] == 'Y')
+          {
+            xQueueSend(serial_rx_cmd_queue, &cmd_buffer, pdMS_TO_TICKS(2));
+          }
+          else if (VERBOSE) //command in the wrong format
+          {
+            queue_printf<VERBOSE_BUFFER_SIZE>(serial_tx_verbose_queue, "\n[Serial_rx_task]\n  Fehlerhaftes Datentelegramm: %s\n", cmd_buffer);
+          }
+        }
+        else 
         {
           // Read the available bytes if any unknown command
           size_t availableBytes = Serial.available();
@@ -474,7 +497,6 @@ void rx_task(void *pvParameters)
           }
         }
         while(Serial.available()) Serial.read(); //clear hardware buffer
-        memset(cmd_buffer, '\0', CMD_BUFFER_SIZE); 
       }
     }
 }
