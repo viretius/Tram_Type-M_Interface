@@ -25,7 +25,7 @@ Interface with the purpose of operating Trains with the "THM-Simulator" and "Lok
 * To Upload to a "normal" ESP32 model, use the appropriate board in the platformio.ini file together with platformIO's integrated "Upload" and "upload filesystem" functions
 
 
-### Dont forget so pick the right COM-Port!
+* Dont forget so pick the right COM-Port!
 
 
 ## To-Do
