@@ -28,9 +28,9 @@ To Upload to a "normal" ESP32 model, use the appropriate board in the platformio
 
 Dont forget so pick the right COM-Port!
 
-#
 
 ## To-Do
 - [ ] make use of the default ESP32-S3 partition (for some reason, the default "factory" part is to small)
 - [ ] Evaluating the data packets from LokSim3D-Server and setting the outputs accordingly
 - [ ] Store Config in Header-Files instead of using Filesystem
+
