@@ -22,6 +22,7 @@ Follow the steps below to perform a fresh upload to an Arduino/Waveshare Nano ES
    
 4. **Upload `littlefs.bin` to address `0x190000` (SPIFFS)**
 
+To Upload to a "normal" ESP32 model, use the appropriate board in the platformio.ini file together with platformIO's "Upload"-option and "upload filesystem"-option
 
 ## To-Do
 - [ ] make use of the default ESP32-S3 partition (for some reason, the default "factory" part is to small)
