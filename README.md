@@ -26,7 +26,7 @@ Follow the steps below to perform a fresh upload to an Arduino/Waveshare Nano ES
 
 To Upload to a "normal" ESP32 model, pick the appropriate board in the platformio.ini file together with platformIO's integrated "Upload" and "upload filesystem" functions
 
-Dont forget so pick the right COM-Port!
+Dont forget to pick the right COM-Port!
 
 
 ## To-Do
