@@ -537,8 +537,7 @@ void config_task (void * pvParameters)
   {
     vTaskDelay(2);
 
-    //suspend tasks to prevent data corruption, if user changes configuration
-    //also there is simply no need to poll inputs or outputs, while in the config menu
+    //no need for the other tasks to be running 
     vTaskSuspend(digital_input_task_handle);
     vTaskSuspend(analog_input_task_handle);
     vTaskSuspend(output_task_handle);
