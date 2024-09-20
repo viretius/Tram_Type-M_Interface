@@ -6,7 +6,7 @@ void init_typeM_interface()
     Serial.begin(9600); 
     while(!Serial){;} 
  
-    #if ( ARDUINO_NANO_ESP32)
+    #if ( ARDUINO_NANO_ESP32 ) //loksim3d only available for esp32-s3
     USB.begin();
     //wait for USB-Serial connection to be established (DTR signal is expected)
 
